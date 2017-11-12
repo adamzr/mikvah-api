@@ -1,5 +1,53 @@
 package org.lamikvah.website.resource;
 
-public class UserController {
+import java.security.Principal;
+import java.util.Optional;
 
+import javax.servlet.http.HttpServletRequest;
+
+import org.lamikvah.website.data.MikvahUser;
+import org.lamikvah.website.data.UserRequestDto;
+import org.lamikvah.website.exception.NotFoundException;
+import org.lamikvah.website.exception.ServerErrorException;
+import org.lamikvah.website.service.MikvahUserService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.auth0.exception.Auth0Exception;
+
+import lombok.extern.slf4j.Slf4j;
+
+@CrossOrigin
+@RestController
+@Slf4j
+public class UserController {
+    
+    @Autowired private MikvahUserService service;
+
+    @PostMapping("/user")
+    public MikvahUser saveUser(HttpServletRequest request, UserRequestDto userRequest) {
+        Principal principal = request.getUserPrincipal();
+        String auth0UserId =  principal.getName();
+        try {
+            return service.saveUser(auth0UserId, userRequest.getFirstName(), userRequest.getLastName());
+        } catch (Auth0Exception e) {
+            log.error("Failed to get email from Auth0.", e);
+            throw new ServerErrorException("There was a problem saving the user information. Please try again later.", e);
+        }
+    }
+    
+    @GetMapping("/user")
+    public MikvahUser getUser(HttpServletRequest request, UserRequestDto userRequest) {
+        Principal principal = request.getUserPrincipal();
+        String auth0UserId = principal.getName();
+        Optional<MikvahUser> user = service.getUser(auth0UserId);
+        if(user.isPresent()) {
+            return user.get();
+        } else {
+            throw new NotFoundException("User not found!");
+        }
+    }
 }

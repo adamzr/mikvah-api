@@ -13,9 +13,10 @@ import com.auth0.spring.security.api.JwtWebSecurityConfigurer;
 @Configuration
 public class SecurityConfiguration extends WebSecurityConfigurerAdapter {
 
-    @Value(value = "${auth0.apiAudience}")
+    @Value("${auth0.apiAudience}")
     private String apiAudience;
-    @Value(value = "${auth0.issuer}")
+    
+    @Value("${auth0.issuer}")
     private String issuer;
 
     @Override
@@ -27,6 +28,8 @@ public class SecurityConfiguration extends WebSecurityConfigurerAdapter {
                 .antMatchers(HttpMethod.GET, "/test-no-auth").permitAll()
                 .antMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 .antMatchers(HttpMethod.GET, "/test-auth").hasAuthority("create:appointments")
+                .antMatchers(HttpMethod.GET, "/user").authenticated()
+                .antMatchers(HttpMethod.POST, "/user").authenticated()
                 .anyRequest().authenticated();
     }
 }

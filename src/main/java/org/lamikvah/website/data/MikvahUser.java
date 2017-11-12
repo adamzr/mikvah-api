@@ -13,16 +13,18 @@ import lombok.Data;
 @Data
 @Entity
 @Table(indexes= {@Index(columnList="auth0_user_id", name="auth0_user_id_idx"), @Index(columnList="email", name="email_idx")})
-public class User {
+public class MikvahUser {
 
     @Id
     @GeneratedValue(strategy=GenerationType.AUTO)
     private Long id;
     
+    private String title;
+    
     private String firstName;
     
     private String lastName;
-    
+        
     @Column(name="email")
     private String email;
     
