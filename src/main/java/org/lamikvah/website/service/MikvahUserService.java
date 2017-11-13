@@ -36,20 +36,32 @@ public class MikvahUserService {
         
     }
     
-    public MikvahUser saveUser(String auth0UserId, String firstName, String lastName) throws Auth0Exception {
+    public MikvahUser saveUser(String auth0UserId, String title, String firstName, String lastName) throws Auth0Exception {
         
         MikvahUser user = userRepository.getByAuth0UserId(auth0UserId).orElse(new MikvahUser());
-        String email = getUserEmail(auth0UserId);
-        user.setEmail(email);
+        if(user.getEmail() == null) {
+            String email = getUserEmail(auth0UserId);
+            user.setEmail(email);
+        }
+        user.setTitle(title);
         user.setFirstName(firstName);
         user.setLastName(lastName);
+        user.setAuth0UserId(auth0UserId);
         return userRepository.save(user);
         
     }
     
-    public Optional<MikvahUser> getUser(String auth0UserId) {
+    public MikvahUser getUser(String auth0UserId) throws Auth0Exception {
         
-        return userRepository.getByAuth0UserId(auth0UserId);
+        Optional<MikvahUser> user = userRepository.getByAuth0UserId(auth0UserId);
+        if(!user.isPresent()) {
+            MikvahUser newUser = new MikvahUser();
+            newUser.setAuth0UserId(auth0UserId);
+            String email = getUserEmail(auth0UserId);
+            newUser.setEmail(email);
+            return userRepository.save(newUser);
+        }
+        return user.get();
         
     }
 }
