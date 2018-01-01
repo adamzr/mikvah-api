@@ -31,4 +31,9 @@ public class MikvahUser {
     @Column(name="auth0_user_id")
     private String auth0UserId;
     
+    @Column(name="stripe_customer_id")
+    private String stripeCustomerId;
+    
+    private boolean member;
+    
 }

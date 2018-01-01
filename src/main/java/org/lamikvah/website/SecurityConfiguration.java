@@ -26,6 +26,7 @@ public class SecurityConfiguration extends WebSecurityConfigurerAdapter {
                 .configure(http)
                 .authorizeRequests()
                 .antMatchers(HttpMethod.GET, "/test-no-auth").permitAll()
+                .antMatchers(HttpMethod.GET, "/appointments/availability").permitAll()
                 .antMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 .antMatchers(HttpMethod.GET, "/test-auth").hasAuthority("create:appointments")
                 .antMatchers(HttpMethod.GET, "/user").authenticated()

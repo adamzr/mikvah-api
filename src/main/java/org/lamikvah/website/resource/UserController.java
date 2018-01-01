@@ -5,6 +5,7 @@ import java.security.Principal;
 import javax.servlet.http.HttpServletRequest;
 
 import org.lamikvah.website.data.MikvahUser;
+import org.lamikvah.website.data.UserDto;
 import org.lamikvah.website.data.UserRequestDto;
 import org.lamikvah.website.exception.ServerErrorException;
 import org.lamikvah.website.service.MikvahUserService;
@@ -39,14 +40,16 @@ public class UserController {
     }
     
     @GetMapping("/user")
-    public MikvahUser getUser(HttpServletRequest request, UserRequestDto userRequest) {
+    public UserDto getUser(HttpServletRequest request, UserRequestDto userRequest) {
+        
         Principal principal = request.getUserPrincipal();
         String auth0UserId = principal.getName();
         try {
-            return service.getUser(auth0UserId);
+            return service.getUserWithCreditCardInfo(auth0UserId);
         } catch (Auth0Exception e) {
             log.error("Failed to get email from Auth0.", e);
             throw new ServerErrorException("There was a problem getting your user information. Please try again later.", e);
         }
+
     }
 }
