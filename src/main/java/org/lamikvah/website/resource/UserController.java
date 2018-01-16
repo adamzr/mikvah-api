@@ -24,7 +24,7 @@ import lombok.extern.slf4j.Slf4j;
 @RestController
 @Slf4j
 public class UserController {
-    
+
     @Autowired private MikvahUserService service;
 
     @PostMapping("/user")
@@ -32,16 +32,16 @@ public class UserController {
         Principal principal = request.getUserPrincipal();
         String auth0UserId =  principal.getName();
         try {
-            return service.saveUser(auth0UserId, userRequest.getTitle(), userRequest.getFirstName(), userRequest.getLastName());
+            return service.saveUser(auth0UserId, userRequest);
         } catch (Auth0Exception e) {
             log.error("Failed to get email from Auth0.", e);
             throw new ServerErrorException("There was a problem saving your information. Please try again later.", e);
         }
     }
-    
+
     @GetMapping("/user")
     public UserDto getUser(HttpServletRequest request, UserRequestDto userRequest) {
-        
+
         Principal principal = request.getUserPrincipal();
         String auth0UserId = principal.getName();
         try {

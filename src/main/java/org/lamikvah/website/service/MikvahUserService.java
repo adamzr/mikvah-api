@@ -1,12 +1,15 @@
 package org.lamikvah.website.service;
 
 import java.security.Principal;
+import java.time.Clock;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 
 import javax.servlet.http.HttpServletRequest;
 
+import org.lamikvah.website.MikvahConfiguration;
 import org.lamikvah.website.dao.AppointmentSlotRepository;
 import org.lamikvah.website.dao.MikvahUserRepository;
 import org.lamikvah.website.data.AppointmentSlot;
@@ -14,8 +17,9 @@ import org.lamikvah.website.data.AppointmentSlotDto;
 import org.lamikvah.website.data.CreditCard;
 import org.lamikvah.website.data.MikvahUser;
 import org.lamikvah.website.data.UserDto;
+import org.lamikvah.website.data.UserRequestDto;
+import org.lamikvah.website.exception.ServerErrorException;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 
@@ -27,7 +31,8 @@ import com.auth0.net.Request;
 
 @Component
 public class MikvahUserService {
-    
+
+    @Autowired private MikvahConfiguration config;
     @Autowired private MikvahUserRepository userRepository;
     @Autowired private CreditCardService creditCardService;
     @Autowired private AppointmentSlotRepository appointmentSlotRepository;
@@ -35,48 +40,63 @@ public class MikvahUserService {
     private ManagementAPI auth0ManagementApi = new ManagementAPI("{YOUR_DOMAIN}", "{YOUR_API_TOKEN}");
 
     private static final UserFilter NO_OP_USER_FILTER = new UserFilter();
-    
+
     @Autowired
-    public MikvahUserService(@Value("${auth0.issuer}") String domain, @Value("${AUTH0_MANAGEMENT_TOKEN}") String token) {
-        auth0ManagementApi = new ManagementAPI(domain, token);
+    public MikvahUserService(@Autowired MikvahConfiguration config) {
+        auth0ManagementApi = new ManagementAPI(config.getAuth0().getIssuer(), config.getAuth0().getManagementToken());
     }
-    
+
     private String getUserEmail(String principalName) throws Auth0Exception {
-        
+
         Request<User> apiRequest = auth0ManagementApi.users().get(principalName, NO_OP_USER_FILTER);
         User user = apiRequest.execute();
         return user.getEmail();
-        
+
     }
-    
-    public MikvahUser saveUser(String auth0UserId, String title, String firstName, String lastName) throws Auth0Exception {
-        
+
+    public MikvahUser saveUser(String auth0UserId, UserRequestDto request) throws Auth0Exception {
+
         MikvahUser user = userRepository.getByAuth0UserId(auth0UserId).orElse(new MikvahUser());
         if(user.getEmail() == null) {
             String email = getUserEmail(auth0UserId);
             user.setEmail(email);
         }
-        user.setTitle(title);
-        user.setFirstName(firstName);
-        user.setLastName(lastName);
+        user.setTitle(request.getTitle());
+        user.setFirstName(request.getFirstName());
+        user.setLastName(request.getLastName());
         user.setAuth0UserId(auth0UserId);
+
+        user.setAddressLine1(request.getAddressLine1());
+        user.setAddressLine2(request.getAddressLine2());
+        user.setCity(request.getCity());
+        user.setStateCode(request.getStateCode());
+        user.setCountryCode(request.getCountryCode());
+        user.setNotes(request.getNotes());
+        user.setPhoneNumber(request.getPhoneNumber());
+        user.setPostalCode(request.getPostalCode());
+
         return userRepository.save(user);
-        
+
     }
-    
-    public MikvahUser getUser(HttpServletRequest request) throws Auth0Exception {
+
+    public MikvahUser getUser(HttpServletRequest request){
         Principal principal = request.getUserPrincipal();
         String auth0UserId =  principal.getName();
-        return getUser(auth0UserId);
+        try {
+            return getUser(auth0UserId);
+        } catch (Auth0Exception e) {
+            throw new ServerErrorException("There was a problem getting your user information. Please try again later.",
+                    e);
+        }
     }
-    
+
     public UserDto getUserWithCreditCardInfo(String auth0UserId) throws Auth0Exception {
         MikvahUser user = getUser(auth0UserId);
         return convertToUserDto(user);
     }
-    
+
     public MikvahUser getUser(String auth0UserId) throws Auth0Exception {
-        
+
         Optional<MikvahUser> user = userRepository.getByAuth0UserId(auth0UserId);
         if(!user.isPresent()) {
             MikvahUser newUser = new MikvahUser();
@@ -86,22 +106,24 @@ public class MikvahUserService {
             return userRepository.save(newUser);
         }
         return user.get();
-        
+
     }
 
     public void saveUser(MikvahUser user) {
-        
+
         userRepository.save(user);
-        
+
     }
-    
+
     private UserDto convertToUserDto(MikvahUser user) {
-        
+
         Optional<CreditCard> card = creditCardService.getCreditCard(user);
         CreditCard defaultCard = card.orElse(null);
-        
+
         AppointmentSlotDto currentAppointment = null;
-        List<AppointmentSlot> appointments = appointmentSlotRepository.findByStartBetweenAndMikvahUserOrderByStartAsc(LocalDateTime.now(), LocalDateTime.now().plusDays(30), user);
+        LocalDateTime now = LocalDateTime.now(Clock.system(ZoneId.of(config.getTimeZone())));
+        LocalDateTime thirtyDaysFromNow = now.plusDays(30);
+        List<AppointmentSlot> appointments = appointmentSlotRepository.findByStartBetweenAndMikvahUserOrderByStartAsc(now, thirtyDaysFromNow, user);
         if(!CollectionUtils.isEmpty(appointments)) {
             AppointmentSlot appointment = appointments.get(appointments.size() - 1);
             currentAppointment = AppointmentSlotDto.builder()
@@ -109,13 +131,20 @@ public class MikvahUserService {
                     .start(appointment.getStart())
                     .build();
         }
-        
+
         return UserDto.builder()
                 .auth0UserId(user.getAuth0UserId())
                 .email(user.getEmail())
                 .firstName(user.getFirstName())
                 .id(user.getId())
                 .lastName(user.getLastName())
+                .addressLine1(user.getAddressLine1())
+                .addressLine2(user.getAddressLine2())
+                .city(user.getCity())
+                .postalCode(user.getPostalCode())
+                .countryCode(user.getCountryCode())
+                .phoneNumber(user.getPhoneNumber())
+                .notes(user.getNotes())
                 .member(user.isMember())
                 .stripeCustomerId(user.getStripeCustomerId())
                 .title(user.getTitle())

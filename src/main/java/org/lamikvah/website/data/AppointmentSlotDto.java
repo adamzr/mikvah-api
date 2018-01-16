@@ -13,4 +13,6 @@ public class AppointmentSlotDto {
     
     LocalDateTime start;
     
+    String notes;
+    
 }

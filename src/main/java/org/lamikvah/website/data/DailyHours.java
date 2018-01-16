@@ -1,14 +1,44 @@
 package org.lamikvah.website.data;
 
-import java.time.LocalDate;
+import java.sql.Date;
+import java.sql.Time;
 import java.time.LocalTime;
+import java.util.Optional;
 
-import lombok.Value;
+import javax.persistence.Entity;
+import javax.persistence.Id;
+import javax.persistence.Index;
+import javax.persistence.Table;
 
-@Value
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
+import lombok.Data;
+
+@Data
+@Entity
+@Table(indexes= {@Index(columnList="day", name="daily_hours_day_idx")})
 public class DailyHours {
 
-	private LocalDate day;
-	private LocalTime opening;
-	private LocalTime closing;
+    @Id
+    private Date day;
+
+    private Time opening;
+
+    private Time closing;
+
+    private boolean closed;
+
+    @JsonIgnore
+    public Optional<LocalTime> getOpeningLocalTime() {
+
+        return Optional.ofNullable(opening.toLocalTime());
+
+    }
+
+    @JsonIgnore
+    public Optional<LocalTime> getClosingLocalTime() {
+
+        return Optional.ofNullable(closing.toLocalTime());
+
+    }
 }

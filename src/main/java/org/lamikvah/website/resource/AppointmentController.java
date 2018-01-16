@@ -1,8 +1,8 @@
 package org.lamikvah.website.resource;
 
-import java.security.Principal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 import javax.servlet.http.HttpServletRequest;
 
@@ -11,7 +11,6 @@ import org.lamikvah.website.data.AppointmentRequest;
 import org.lamikvah.website.data.AppointmentSlotDto;
 import org.lamikvah.website.data.MikvahUser;
 import org.lamikvah.website.exception.AppointmentCreationException;
-import org.lamikvah.website.exception.ServerErrorException;
 import org.lamikvah.website.service.AppointmentService;
 import org.lamikvah.website.service.MikvahUserService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,8 +22,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.auth0.exception.Auth0Exception;
-
 import lombok.extern.slf4j.Slf4j;
 
 @CrossOrigin
@@ -35,20 +32,9 @@ public class AppointmentController {
 
     @Autowired
     private AppointmentService appointmentService;
-    
+
     @Autowired
     private MikvahUserService mikvahUserService;
-
-    @GetMapping(value = "/test-auth")
-    public String testAuth(HttpServletRequest request) {
-        Principal principal = request.getUserPrincipal();
-        return principal.getName();
-    }
-
-    @GetMapping(value = "/test-no-auth")
-    public String testNoAuth() {
-        return "Hello, World!";
-    }
 
     @GetMapping("/appointments/availability")
     public List<LocalDateTime> getAvailableAppointments() {
@@ -57,13 +43,7 @@ public class AppointmentController {
 
     @PostMapping("/appointments")
     public AppointmentCreationResponse createAppointment(@RequestBody AppointmentRequest appointmentRequest, HttpServletRequest request) {
-        MikvahUser user;
-        try {
-            user = mikvahUserService.getUser(request);
-        } catch (Auth0Exception e) {
-            throw new ServerErrorException("There was a problem getting your user information. Please try again later.",
-                    e);
-        }
+        MikvahUser user = mikvahUserService.getUser(request);
         try {
             AppointmentSlotDto slot = appointmentService.createAppointment(appointmentRequest,
                     user);
@@ -77,19 +57,18 @@ public class AppointmentController {
                     .build();
         }
     }
-    
+
     @DeleteMapping("/appointments/{id}")
     public String cancelAppointment(@PathVariable("id") Long id, HttpServletRequest request) {
-        MikvahUser user;
-        try {
-            user = mikvahUserService.getUser(request);
-        } catch (Auth0Exception e) {
-            throw new ServerErrorException("There was a problem getting your user information. Please try again later.",
-                    e);
+        MikvahUser user = mikvahUserService.getUser(request);
+        Optional<String> refundId = appointmentService.cancelAppointment(user, id);
+        log.info("Cancelled appointment {}.", id);
+        if(refundId.isPresent()) {
+            return "\"Your appointment was cancelled and your fee was refunded. Thank you.\"";
+        } else {
+            return "\"Your appointment was cancelled. Thank you.\"";
         }
-        appointmentService.cancelAppointment(user, id);
-        log.info("Cancelled appointment " + id);
-        return "\"Cancelled appointment " + id + "\"";
+
     }
 
 }

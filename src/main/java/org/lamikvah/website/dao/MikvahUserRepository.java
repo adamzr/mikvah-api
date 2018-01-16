@@ -8,5 +8,7 @@ import org.springframework.data.repository.CrudRepository;
 public interface MikvahUserRepository extends CrudRepository<MikvahUser, Long>{
 
     public Optional<MikvahUser> getByAuth0UserId(String auth0UserId);
-    
+
+    public Optional<MikvahUser> findByStripeCustomerId(String stripeCustomerId);
+
 }

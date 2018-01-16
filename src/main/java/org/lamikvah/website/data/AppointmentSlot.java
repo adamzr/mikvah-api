@@ -18,22 +18,27 @@ import lombok.Data;
 
 @Data
 @Entity
-@Table(indexes= {@Index(columnList="start", name="start_idx"), @Index(columnList="mikvah_user_id", name="mikvah_user_id_idx")})
+@Table(indexes= {
+        @Index(columnList="start", name="appointment_slot_start_idx"),
+        @Index(columnList="mikvah_user_id", name="appointment_slot_mikvah_user_id_idx")})
 public class AppointmentSlot {
 
     @Id
-    @GeneratedValue(strategy=GenerationType.AUTO)
+    @GeneratedValue(strategy = GenerationType.SEQUENCE)
     private Long id;
-    
+
     @Column(name="start")
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime start;
-    
+
     @ManyToOne(optional=true)
     @JoinColumn(name="mikvah_user_id")
     private MikvahUser mikvahUser;
-    
+
     @Column(name="stripe_charge_id")
     private String stripeChargeId;
+
+    @Column(name="notes")
+    private String notes;
 
 }

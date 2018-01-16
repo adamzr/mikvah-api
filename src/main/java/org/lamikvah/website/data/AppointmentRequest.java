@@ -8,5 +8,6 @@ import lombok.Data;
 public class AppointmentRequest {
 
     private LocalDateTime time;
+    private String notes;
     
 }
