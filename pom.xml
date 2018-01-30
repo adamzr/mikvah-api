@@ -4,11 +4,11 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>org.lamikvah</groupId>
-    <artifactId>website</artifactId>
-    <version>0.0.1-SNAPSHOT</version>
+    <artifactId>mikvah</artifactId>
+    <version>1.0.1</version>
     <packaging>jar</packaging>
 
-    <name>website</name>
+    <name>mikvah</name>
     <description>LA Mikvah Website</description>
 
     <parent>

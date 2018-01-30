@@ -30,6 +30,7 @@ public class StripeWebhookController {
     @PostMapping("/webhook")
     public ResponseEntity<String> handleStripeEvent(@RequestBody String payload, @RequestHeader("Stripe-Signature") String sigHeader) {
 
+        log.info("Processing event {}", payload);
         Event event;
         try {
             event = Webhook.constructEvent(payload, sigHeader, config.getStripe().getWebhookEndpointSecret());
