@@ -1,5 +1,9 @@
 package org.lamikvah.website.data;
 
+import java.time.LocalDateTime;
+
+import com.fasterxml.jackson.annotation.JsonFormat;
+
 import lombok.Builder;
 import lombok.Value;
 
@@ -38,6 +42,13 @@ public class UserDto {
     String stripeCustomerId;
 
     boolean member;
+
+    Plan membershipPlan;
+
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    LocalDateTime membershipExpirationDate;
+
+    boolean membershipAutoRenewalEnabled;
 
     CreditCard defaultCard;
 

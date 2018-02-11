@@ -150,4 +150,44 @@ public class MembershipService {
 
     }
 
+    public void disableAutoRenew(MikvahUser user) throws AuthenticationException, InvalidRequestException, APIConnectionException, CardException, APIException {
+        Optional<Membership> membershipOptional = membershipRepository.findByMikvahUser(user);
+        if(membershipOptional.isPresent()) {
+            Membership membership = membershipOptional.get();
+            if(membership.isAutoRenewEnabled()) {
+                Subscription subscription = Subscription.retrieve(membership.getStripeSubscriptionId());
+                Map<String, Object> params = new HashMap<>();
+                params.put("at_period_end", true);
+                subscription.cancel(params);
+                membership.setAutoRenewEnabled(false);
+                membershipRepository.save(membership);
+            }
+        }
+    }
+
+    public void enableAutoRenew(MikvahUser user) throws AuthenticationException, InvalidRequestException, APIConnectionException, CardException, APIException {
+        Optional<Membership> membershipOptional = membershipRepository.findByMikvahUser(user);
+        if(membershipOptional.isPresent()) {
+            Membership membership = membershipOptional.get();
+            if(!membership.isAutoRenewEnabled()) {
+                Subscription subscription = Subscription.retrieve(membership.getStripeSubscriptionId());
+
+                Map<String, Object> item = new HashMap<>();
+                item.put("id", subscription.getSubscriptionItems().getData().get(0).getId());
+                item.put("plan", membership.getPlan().getStripePlanId());
+
+                Map<String, Object> items = new HashMap<>();
+                items.put("0", item);
+
+                Map<String, Object> params = new HashMap<>();
+                params.put("items", items);
+
+                subscription.update(params);
+
+                membership.setAutoRenewEnabled(true);
+                membershipRepository.save(membership);
+            }
+        }
+    }
+
 }

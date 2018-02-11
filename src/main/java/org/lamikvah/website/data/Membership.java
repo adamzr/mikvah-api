@@ -49,4 +49,7 @@ public class Membership {
     @Enumerated(EnumType.STRING)
     private Plan plan;
 
+    @Column(name="auto_renew_enabled")
+    private boolean autoRenewEnabled;
+
 }

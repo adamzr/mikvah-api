@@ -11,11 +11,14 @@ import javax.servlet.http.HttpServletRequest;
 
 import org.lamikvah.website.MikvahConfiguration;
 import org.lamikvah.website.dao.AppointmentSlotRepository;
+import org.lamikvah.website.dao.MembershipRepository;
 import org.lamikvah.website.dao.MikvahUserRepository;
 import org.lamikvah.website.data.AppointmentSlot;
 import org.lamikvah.website.data.AppointmentSlotDto;
 import org.lamikvah.website.data.CreditCard;
+import org.lamikvah.website.data.Membership;
 import org.lamikvah.website.data.MikvahUser;
+import org.lamikvah.website.data.Plan;
 import org.lamikvah.website.data.UserDto;
 import org.lamikvah.website.data.UserRequestDto;
 import org.lamikvah.website.exception.ServerErrorException;
@@ -36,6 +39,7 @@ public class MikvahUserService {
     @Autowired private MikvahUserRepository userRepository;
     @Autowired private CreditCardService creditCardService;
     @Autowired private AppointmentSlotRepository appointmentSlotRepository;
+    @Autowired private MembershipRepository membershipRepository;
 
     private ManagementAPI auth0ManagementApi = new ManagementAPI("{YOUR_DOMAIN}", "{YOUR_API_TOKEN}");
 
@@ -99,11 +103,19 @@ public class MikvahUserService {
 
         Optional<MikvahUser> user = userRepository.getByAuth0UserId(auth0UserId);
         if(!user.isPresent()) {
-            MikvahUser newUser = new MikvahUser();
-            newUser.setAuth0UserId(auth0UserId);
             String email = getUserEmail(auth0UserId);
-            newUser.setEmail(email);
-            return userRepository.save(newUser);
+            user = userRepository.findByEmail(email);
+            if(!user.isPresent()) {
+                MikvahUser newUser = new MikvahUser();
+                newUser.setAuth0UserId(auth0UserId);
+                newUser.setEmail(email);
+                return userRepository.save(newUser);
+            } else {
+                MikvahUser partialUser = user.get();
+                partialUser.setEmail(email);
+                return userRepository.save(partialUser);
+            }
+
         }
         return user.get();
 
@@ -132,6 +144,16 @@ public class MikvahUserService {
                     .build();
         }
 
+        Plan plan = null;
+        LocalDateTime expirationDate = null;
+        boolean membershipAutoRenewalEnabled = true;
+        Optional<Membership> membership = membershipRepository.findByMikvahUser(user);
+        if(membership.isPresent()) {
+            plan = membership.get().getPlan();
+            expirationDate = membership.get().getExpiration();
+            membershipAutoRenewalEnabled = membership.get().isAutoRenewEnabled();
+        }
+
         return UserDto.builder()
                 .auth0UserId(user.getAuth0UserId())
                 .email(user.getEmail())
@@ -150,6 +172,9 @@ public class MikvahUserService {
                 .title(user.getTitle())
                 .defaultCard(defaultCard)
                 .currentAppointment(currentAppointment)
+                .membershipExpirationDate(expirationDate)
+                .membershipPlan(plan)
+                .membershipAutoRenewalEnabled(membershipAutoRenewalEnabled)
                 .build();
     }
 }

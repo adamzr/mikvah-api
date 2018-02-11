@@ -11,4 +11,6 @@ public interface MikvahUserRepository extends CrudRepository<MikvahUser, Long>{
 
     public Optional<MikvahUser> findByStripeCustomerId(String stripeCustomerId);
 
+    public Optional<MikvahUser> findByEmail(String email);
+
 }
