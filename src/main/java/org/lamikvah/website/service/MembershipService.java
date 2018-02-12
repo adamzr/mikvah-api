@@ -105,6 +105,7 @@ public class MembershipService {
                                 .plan(plan.get())
                                 .start(LocalDateTime.now(Clock.systemUTC()))
                                 .stripeSubscriptionId(subscriptionId)
+                                .autoRenewEnabled(true)
                                 .build();
 
                     }
