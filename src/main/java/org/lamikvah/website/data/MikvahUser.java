@@ -8,6 +8,8 @@ import javax.persistence.Id;
 import javax.persistence.Index;
 import javax.persistence.Table;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -59,5 +61,12 @@ public class MikvahUser {
     private String postalCode;
 
     private String countryCode;
+
+    @JsonIgnore
+    public String getFullName() {
+        String name = title + " " + firstName + " " + lastName;
+        name = name.trim();
+        return name;
+    }
 
 }

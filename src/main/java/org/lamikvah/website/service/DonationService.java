@@ -20,13 +20,17 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class DonationService {
 
-    public void donate(MikvahUser user, double amount) {
+    public void donate(MikvahUser user, double amount, String stripeToken) {
 
         // Charge the user's card:
         Map<String, Object> chargeParams = new HashMap<>();
         chargeParams.put("amount", String.valueOf((int)(amount * 100)));
         chargeParams.put("currency", "usd");
-        chargeParams.put("customer", user.getStripeCustomerId());
+        if (user != null) {
+            chargeParams.put("customer", user.getStripeCustomerId());
+        } else {
+            chargeParams.put("source", stripeToken);
+        }
         try {
             Charge charge = Charge.create(chargeParams);
             log.info("User with id={} donated amount={} USD with charge ID={}", user.getId(), amount, charge.getId());

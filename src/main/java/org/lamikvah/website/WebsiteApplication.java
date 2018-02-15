@@ -33,7 +33,7 @@ public class WebsiteApplication {
             }
         };
     }
-    
+
     @Bean
     public TaskScheduler taskScheduler() {
         ThreadPoolTaskScheduler scheduler = new ThreadPoolTaskScheduler();

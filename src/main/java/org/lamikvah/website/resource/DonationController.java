@@ -12,7 +12,10 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
+import lombok.extern.slf4j.Slf4j;
+
 @RestController
+@Slf4j
 public class DonationController {
 
     @Autowired private DonationService donationService;
@@ -22,9 +25,14 @@ public class DonationController {
     @PostMapping("/donate")
     public MessageResponse donate(@RequestBody DonationRequest donationRequest, HttpServletRequest httpRequest) {
 
-        MikvahUser user = userService.getUser(httpRequest);
+        MikvahUser user = null;
+        try {
+            user = userService.getUser(httpRequest);
+        } catch (Exception e) {
+            log.info("No user on donation request.");
+        }
 
-        donationService.donate(user, donationRequest.getAmount());
+        donationService.donate(user, donationRequest.getAmount(), donationRequest.getToken());
 
         return MessageResponse.builder()
                 .success(true)

@@ -7,4 +7,6 @@ public class DonationRequest {
 
     private double amount;
 
+    private String token;
+
 }

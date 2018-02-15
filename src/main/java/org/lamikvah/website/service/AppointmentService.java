@@ -50,6 +50,9 @@ public class AppointmentService {
     @Autowired
     private ReservationHistoryLogRepository reservationHistoryLogRepository;
 
+    @Autowired
+    private EmailService emailService;
+
     public List<LocalDateTime> getAvailableTimes() {
         LocalDateTime start = LocalDateTime.now(Clock.system(ZoneId.of(config.getTimeZone())));
         LocalDateTime end = start.plusDays(8);
@@ -87,6 +90,8 @@ public class AppointmentService {
             reservationHistoryLog.setStripeId(stripeChargeId.get());
         }
         reservationHistoryLogRepository.save(reservationHistoryLog);
+
+        emailService.sendAppointmentConfirmationEmail(user, savedSlot);
 
         return AppointmentSlotDto.builder()
                 .id(savedSlot.getId())

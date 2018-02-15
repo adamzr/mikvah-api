@@ -5,7 +5,7 @@
 
     <groupId>org.lamikvah</groupId>
     <artifactId>mikvah</artifactId>
-    <version>1.0.4</version>
+    <version>1.0.5</version>
     <packaging>jar</packaging>
 
     <name>mikvah</name>
@@ -118,10 +118,16 @@
         </dependency>
 
         <dependency>
-    <groupId>org.simplejavamail</groupId>
-    <artifactId>simple-java-mail</artifactId>
-    <version>4.4.5</version>
-</dependency>
+            <groupId>org.simplejavamail</groupId>
+            <artifactId>simple-java-mail</artifactId>
+            <version>5.0.0</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.github.spullara.mustache.java</groupId>
+            <artifactId>compiler</artifactId>
+            <version>0.9.5</version>
+        </dependency>
 
         <dependency>
             <groupId>org.springframework.boot</groupId>
