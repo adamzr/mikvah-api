@@ -6,6 +6,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.builders.WebSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
 
@@ -36,6 +37,18 @@ public class SecurityConfiguration extends WebSecurityConfigurerAdapter {
                 .antMatchers(HttpMethod.GET, "/metrics").permitAll()
                 .antMatchers(HttpMethod.GET, "/info").permitAll()
                 .antMatchers(HttpMethod.POST, "/webhook").permitAll()
+                .antMatchers(HttpMethod.GET, "/attendent-daily-list").permitAll()
                 .anyRequest().authenticated();
     }
+
+    @Override
+    public void configure(WebSecurity web) throws Exception {
+        web
+        .ignoring()
+            .antMatchers(HttpMethod.GET, "/hours")
+            .antMatchers(HttpMethod.POST, "/donate")
+            .antMatchers(HttpMethod.GET, "/appointments/availability");
+    }
+
+
 }

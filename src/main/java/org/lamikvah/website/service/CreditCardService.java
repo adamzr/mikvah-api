@@ -53,7 +53,7 @@ public class CreditCardService {
             throw new ServerErrorException(ERROR_MESSAGE, e);
         }
     }
-    
+
     public Optional<CreditCard> getCreditCard(MikvahUser user) {
         if(StringUtils.isEmpty(user.getStripeCustomerId())) {
             return Optional.empty();
@@ -80,7 +80,7 @@ public class CreditCardService {
             return Optional.empty();
         }
     }
-    
+
     private void createCard(MikvahUser user, String token) throws AuthenticationException, InvalidRequestException, APIConnectionException, CardException, APIException {
         String customerId = user.getStripeCustomerId();
         Customer customer = Customer.retrieve(customerId);
@@ -89,7 +89,7 @@ public class CreditCardService {
         ExternalAccount source = customer.getSources().create(params);
         setDefaultCard(customerId, source.getId());
     }
-    
+
     private void setDefaultCard(String customerId, String sourceId) throws AuthenticationException, InvalidRequestException, APIConnectionException, CardException, APIException {
         Customer customer = Customer.retrieve(customerId);
         Map<String, Object> params = new HashMap<>();
@@ -105,4 +105,5 @@ public class CreditCardService {
         user.setStripeCustomerId(customer.getId());
         mikvahUserService.saveUser(user);
     }
+
 }

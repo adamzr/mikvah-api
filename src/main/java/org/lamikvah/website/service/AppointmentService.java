@@ -2,7 +2,10 @@ package org.lamikvah.website.service;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -16,6 +19,7 @@ import org.lamikvah.website.data.AppointmentAction;
 import org.lamikvah.website.data.AppointmentRequest;
 import org.lamikvah.website.data.AppointmentSlot;
 import org.lamikvah.website.data.AppointmentSlotDto;
+import org.lamikvah.website.data.AttendentAppointmentView;
 import org.lamikvah.website.data.MikvahUser;
 import org.lamikvah.website.data.ReservationHistoryLog;
 import org.lamikvah.website.exception.AppointmentCreationException;
@@ -40,6 +44,8 @@ import lombok.extern.slf4j.Slf4j;
 @Component
 @Slf4j
 public class AppointmentService {
+
+    private static final DateTimeFormatter TIME_FORMAT = DateTimeFormatter.ofPattern("h:mm a");
 
     @Autowired
     private MikvahConfiguration config;
@@ -171,6 +177,22 @@ public class AppointmentService {
             log.info("Card processing error.", e);
             throw new AppointmentCreationException("There was a problem processing your payment. " + e.getLocalizedMessage());
         }
+
+    }
+
+    public List<AttendentAppointmentView> getAppointmentsForAttendants(LocalDateTime now) {
+        List<AppointmentSlot> todaysSlots = appointmentSlotRepository.findByStartBetweenOrderByStartAsc(now.toLocalDate().atStartOfDay(), now.toLocalDate().atTime(LocalTime.MAX));
+        return todaysSlots.stream()
+                .filter(slot -> slot.getMikvahUser() != null)
+                .map(slot -> {
+                    return AttendentAppointmentView.builder()
+                            .firstName(slot.getMikvahUser().getFirstName())
+                            .time(slot.getStart().toLocalTime().format(TIME_FORMAT))
+                            .notes(slot.getNotes())
+                            .build();
+                })
+                .sorted(Comparator.comparing(AttendentAppointmentView::getTime))
+                .collect(Collectors.toList());
 
     }
 }

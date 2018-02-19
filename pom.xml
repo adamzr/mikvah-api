@@ -5,7 +5,7 @@
 
     <groupId>org.lamikvah</groupId>
     <artifactId>mikvah</artifactId>
-    <version>1.0.6</version>
+    <version>1.0.7</version>
     <packaging>jar</packaging>
 
     <name>mikvah</name>
@@ -114,7 +114,7 @@
         <dependency>
             <groupId>org.flywaydb</groupId>
             <artifactId>flyway-core</artifactId>
-            <version>5.0.5</version>
+            <version>5.0.5</version><!--$NO-MVN-MAN-VER$-->
         </dependency>
 
         <dependency>
@@ -133,6 +133,12 @@
             <groupId>com.github.spullara.mustache.java</groupId>
             <artifactId>compiler</artifactId>
             <version>0.9.5</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.logback-extensions</groupId>
+            <artifactId>logback-ext-loggly</artifactId>
+            <version>0.1.2</version>
         </dependency>
 
         <dependency>
