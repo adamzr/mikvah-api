@@ -31,11 +31,28 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class MembershipService {
 
+    private static final int MEMBERSHIP_LENGTH = 1;
     @Autowired private MembershipRepository membershipRepository;
     @Autowired private MikvahUserRepository userRepository;
+    @Autowired private EmailService emailService;
 
     private static final String ERROR_MESSAGE = "There was a problem handling your membership payment. Please try again later.";
 
+    public Membership createOfflineMembership(MikvahUser user, Plan plan) {
+
+        LocalDateTime start = LocalDateTime.now(Clock.systemUTC());
+        LocalDateTime expiration = start.plusYears(MEMBERSHIP_LENGTH);
+        Membership membership = Membership.builder()
+                .mikvahUser(user)
+                .plan(plan)
+                .start(start)
+                .expiration(expiration)
+                .autoRenewEnabled(false)
+                .build();
+
+        return membershipRepository.save(membership);
+
+    }
     public void createMembership(MikvahUser user, Plan plan) {
         Map<String, Object> item = new HashMap<>();
         item.put("plan", plan.getStripePlanId());
@@ -81,10 +98,12 @@ public class MembershipService {
                     String subscriptionId = line.getId();
                     Optional<Membership> membershipOptional = membershipRepository.findByStripeSubscriptionId(subscriptionId);
                     Membership membership;
+                    boolean isNewMembership = false;
 
                     if(membershipOptional.isPresent()) {
 
                         membership = membershipOptional.get();
+                        isNewMembership = true;
 
                     } else {
 
@@ -118,6 +137,12 @@ public class MembershipService {
                     user.setMember(true);
                     userRepository.save(user);
 
+                    if(isNewMembership) {
+                        emailService.sendNewMemberEmail(user, membership);
+                    } else {
+                        emailService.sendMembershipRenewalEmail(user, membership);
+                    }
+
                     log.info("Activated membership for user with id={} based on invoice={}", user.getId(), invoice.getId());
 
                 }
@@ -146,6 +171,8 @@ public class MembershipService {
         user.setMember(false);
         userRepository.save(user);
 
+        emailService.sendMembershipEndedEmail(user);
+
         log.info("Cancelled membership for user with id={} subscription={}.", user.getId(), subscription.getId());
         return;
 
@@ -162,6 +189,7 @@ public class MembershipService {
                 subscription.cancel(params);
                 membership.setAutoRenewEnabled(false);
                 membershipRepository.save(membership);
+                emailService.sendAutoRenewDisabledEmail(user);
             }
         }
     }
@@ -187,6 +215,8 @@ public class MembershipService {
 
                 membership.setAutoRenewEnabled(true);
                 membershipRepository.save(membership);
+
+                emailService.sendAutoRenewEnabledEmail(user);
             }
         }
     }

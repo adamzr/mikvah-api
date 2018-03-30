@@ -5,6 +5,7 @@ import java.security.Principal;
 import javax.servlet.http.HttpServletRequest;
 
 import org.lamikvah.website.data.MikvahUser;
+import org.lamikvah.website.data.UserCreationRequestDto;
 import org.lamikvah.website.data.UserDto;
 import org.lamikvah.website.data.UserRequestDto;
 import org.lamikvah.website.exception.ServerErrorException;
@@ -37,6 +38,13 @@ public class UserController {
             log.error("Failed to get email from Auth0.", e);
             throw new ServerErrorException("There was a problem saving your information. Please try again later.", e);
         }
+    }
+
+    @PostMapping("/admin/user")
+    public MikvahUser createUser(@RequestBody UserCreationRequestDto userRequest) {
+
+        return service.createUser(userRequest);
+
     }
 
     @GetMapping("/user")

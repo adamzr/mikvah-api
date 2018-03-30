@@ -5,6 +5,7 @@ import java.util.Map;
 
 import org.lamikvah.website.data.MikvahUser;
 import org.lamikvah.website.exception.AppointmentCreationException;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import com.stripe.exception.APIConnectionException;
@@ -19,6 +20,8 @@ import lombok.extern.slf4j.Slf4j;
 @Component
 @Slf4j
 public class DonationService {
+    
+    @Autowired private EmailService emailService;
 
     public void donate(MikvahUser user, double amount, String stripeToken) {
 
@@ -41,6 +44,8 @@ public class DonationService {
             log.info("Card processing error.", e);
             throw new AppointmentCreationException("There was a problem processing your payment. " + e.getLocalizedMessage());
         }
+        
+        emailService.sendDonationEmail(user);
 
     }
 

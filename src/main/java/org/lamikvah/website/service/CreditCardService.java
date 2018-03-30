@@ -30,9 +30,16 @@ public class CreditCardService {
     @Autowired
     private MikvahUserService mikvahUserService;
 
+    @Autowired
+    private EmailService emailService;
+
     public void addNewCreditCard(MikvahUser user, String token) {
+
+        boolean isUsersFirstCreditCard = false;
+
         try {
             if(StringUtils.isEmpty(user.getStripeCustomerId())) {
+                isUsersFirstCreditCard = true;
                 createCustomer(user);
             }
             createCard(user, token);
@@ -51,6 +58,10 @@ public class CreditCardService {
         } catch (APIException e) {
             log.warn("STRIPE: API errors cover any other type of problem (e.g., a temporary problem with Stripe's servers) and are extremely uncommon.", e);
             throw new ServerErrorException(ERROR_MESSAGE, e);
+        }
+
+        if(!isUsersFirstCreditCard) {
+            emailService.sendCreditCardUpdateEmail(user, getCreditCard(user));
         }
     }
 

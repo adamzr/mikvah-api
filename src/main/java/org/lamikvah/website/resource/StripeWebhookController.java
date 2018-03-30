@@ -3,6 +3,7 @@ package org.lamikvah.website.resource;
 import org.lamikvah.website.MikvahConfiguration;
 import org.lamikvah.website.dao.ProcessedStripeEventRespository;
 import org.lamikvah.website.data.ProcessedStripeEvent;
+import org.lamikvah.website.service.EmailService;
 import org.lamikvah.website.service.MembershipService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -26,6 +27,7 @@ public class StripeWebhookController {
     @Autowired private MikvahConfiguration config;
     @Autowired private ProcessedStripeEventRespository repo;
     @Autowired private MembershipService membershipService;
+    @Autowired private EmailService emailService;
 
     @PostMapping("/webhook")
     public ResponseEntity<String> handleStripeEvent(@RequestBody String payload, @RequestHeader("Stripe-Signature") String sigHeader) {
@@ -47,6 +49,10 @@ public class StripeWebhookController {
 
         String eventType = event.getType();
         switch(eventType) {
+            case "invoice.upcoming":
+                Invoice upcomingInvoice = (Invoice) event.getData().getObject();
+                emailService.sendUpcomingRenewalEmail(upcomingInvoice);
+            break;
             case "invoice.payment_succeeded":
                 Invoice invoice = (Invoice) event.getData().getObject();
                 membershipService.updateMembersip(invoice);

@@ -19,6 +19,7 @@ import org.lamikvah.website.data.CreditCard;
 import org.lamikvah.website.data.Membership;
 import org.lamikvah.website.data.MikvahUser;
 import org.lamikvah.website.data.Plan;
+import org.lamikvah.website.data.UserCreationRequestDto;
 import org.lamikvah.website.data.UserDto;
 import org.lamikvah.website.data.UserRequestDto;
 import org.lamikvah.website.exception.ServerErrorException;
@@ -40,6 +41,7 @@ public class MikvahUserService {
     @Autowired private CreditCardService creditCardService;
     @Autowired private AppointmentSlotRepository appointmentSlotRepository;
     @Autowired private MembershipRepository membershipRepository;
+    @Autowired private EmailService emailService;
 
     private ManagementAPI auth0ManagementApi = new ManagementAPI("{YOUR_DOMAIN}", "{YOUR_API_TOKEN}");
 
@@ -109,6 +111,7 @@ public class MikvahUserService {
                 MikvahUser newUser = new MikvahUser();
                 newUser.setAuth0UserId(auth0UserId);
                 newUser.setEmail(email);
+                emailService.sendWelcomeEmail(newUser);
                 return userRepository.save(newUser);
             } else {
                 MikvahUser partialUser = user.get();
@@ -176,5 +179,29 @@ public class MikvahUserService {
                 .membershipPlan(plan)
                 .membershipAutoRenewalEnabled(membershipAutoRenewalEnabled)
                 .build();
+    }
+
+    public MikvahUser createUser(UserCreationRequestDto request) {
+
+        String email = request.getEmail();
+        Optional<MikvahUser> existingUser = userRepository.findByEmail(email);
+        if(existingUser.isPresent()) {
+            throw new IllegalArgumentException("A user with that email already exists.");
+        }
+        MikvahUser user = new MikvahUser();
+        user.setEmail(email);
+        user.setTitle(request.getTitle());
+        user.setFirstName(request.getFirstName());
+        user.setLastName(request.getLastName());
+        user.setAddressLine1(request.getAddressLine1());
+        user.setAddressLine2(request.getAddressLine2());
+        user.setCity(request.getCity());
+        user.setStateCode(request.getStateCode());
+        user.setCountryCode(request.getCountryCode());
+        user.setNotes(request.getNotes());
+        user.setPhoneNumber(request.getPhoneNumber());
+        user.setPostalCode(request.getPostalCode());
+
+        return userRepository.save(user);
     }
 }

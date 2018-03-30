@@ -108,6 +108,7 @@ public class AppointmentService {
 
     @Transactional(isolation = Isolation.SERIALIZABLE, timeout = 10)
     public Optional<String> cancelAppointment(MikvahUser user, long slotId) {
+
         AppointmentSlot slot = appointmentSlotRepository.findOne(slotId);
         if(slot == null) {
             return Optional.empty();
@@ -138,6 +139,9 @@ public class AppointmentService {
             reservationHistoryLog.setStripeId(refundId.get());
         }
         reservationHistoryLogRepository.save(reservationHistoryLog);
+
+        emailService.sendAppointmentCancellationEmail(user, slot, refundId);
+
         return refundId;
     }
 

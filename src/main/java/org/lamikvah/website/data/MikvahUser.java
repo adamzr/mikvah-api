@@ -8,6 +8,8 @@ import javax.persistence.Id;
 import javax.persistence.Index;
 import javax.persistence.Table;
 
+import org.springframework.util.StringUtils;
+
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import lombok.AllArgsConstructor;
@@ -66,6 +68,9 @@ public class MikvahUser {
     public String getFullName() {
         String name = title + " " + firstName + " " + lastName;
         name = name.trim();
+        if(StringUtils.isEmpty(name)) {
+            return "Mikvah User";
+        }
         return name;
     }
 

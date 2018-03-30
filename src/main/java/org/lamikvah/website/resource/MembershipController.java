@@ -3,6 +3,7 @@ package org.lamikvah.website.resource;
 import javax.servlet.http.HttpServletRequest;
 
 import org.lamikvah.website.data.AutoRenewRequest;
+import org.lamikvah.website.data.Membership;
 import org.lamikvah.website.data.MembershipRequest;
 import org.lamikvah.website.data.MessageResponse;
 import org.lamikvah.website.data.MikvahUser;
@@ -29,6 +30,14 @@ public class MembershipController {
     @Autowired private MembershipService service;
     @Autowired private MikvahUserService userService;
 
+    @PostMapping("/admin/membership")
+    public Membership signUpForOfflineMembership(@RequestBody MembershipRequest membershipRequest, HttpServletRequest httpRequest) {
+
+        MikvahUser user = userService.getUser(httpRequest);
+
+        return service.createOfflineMembership(user, Plan.forStripePlanName(membershipRequest.getPlan()).get());
+
+    }
 
     @PostMapping("/membership")
     public MessageResponse signUpForMembership(@RequestBody MembershipRequest membershipRequest, HttpServletRequest httpRequest) {
