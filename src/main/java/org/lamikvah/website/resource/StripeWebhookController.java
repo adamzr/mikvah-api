@@ -1,5 +1,7 @@
 package org.lamikvah.website.resource;
 
+import java.util.Optional;
+
 import org.lamikvah.website.MikvahConfiguration;
 import org.lamikvah.website.dao.ProcessedStripeEventRespository;
 import org.lamikvah.website.data.ProcessedStripeEvent;
@@ -41,8 +43,8 @@ public class StripeWebhookController {
             return ResponseEntity.noContent().build();
         }
         String eventId = event.getId();
-        ProcessedStripeEvent processedEvent = repo.findOne(eventId);
-        if(processedEvent != null) {
+        Optional<ProcessedStripeEvent> processedEvent = repo.findById(eventId);
+        if(processedEvent.isPresent()) {
             log.warn("Already processed this event!");
             return ResponseEntity.noContent().build();
         }

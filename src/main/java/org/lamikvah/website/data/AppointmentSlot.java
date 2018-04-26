@@ -28,7 +28,7 @@ import lombok.NoArgsConstructor;
 public class AppointmentSlot {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.SEQUENCE)
+    @GeneratedValue(strategy = GenerationType.AUTO)
     private Long id;
 
     @Column(name="start")

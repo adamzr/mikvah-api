@@ -20,7 +20,7 @@ import lombok.extern.slf4j.Slf4j;
 @Component
 @Slf4j
 public class DonationService {
-    
+
     @Autowired private EmailService emailService;
 
     public void donate(MikvahUser user, double amount, String stripeToken) {
@@ -44,8 +44,8 @@ public class DonationService {
             log.info("Card processing error.", e);
             throw new AppointmentCreationException("There was a problem processing your payment. " + e.getLocalizedMessage());
         }
-        
-        emailService.sendDonationEmail(user);
+
+        emailService.sendDonationEmail(user, amount);
 
     }
 

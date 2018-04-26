@@ -5,9 +5,12 @@ import java.util.Map;
 import java.util.Optional;
 
 import org.lamikvah.website.data.CreditCard;
+import org.lamikvah.website.data.Membership;
 import org.lamikvah.website.data.MikvahUser;
 import org.lamikvah.website.exception.ServerErrorException;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
@@ -27,11 +30,16 @@ import lombok.extern.slf4j.Slf4j;
 public class CreditCardService {
 
     private static final String ERROR_MESSAGE = "There was a problem processing your payment information. Please try again later.";
+
     @Autowired
     private MikvahUserService mikvahUserService;
 
     @Autowired
-    private EmailService emailService;
+    @Lazy
+    private Optional<EmailService> emailService;
+
+    @Autowired
+    private MembershipService membershipService;
 
     public void addNewCreditCard(MikvahUser user, String token) {
 
@@ -61,8 +69,10 @@ public class CreditCardService {
         }
 
         if(!isUsersFirstCreditCard) {
-            emailService.sendCreditCardUpdateEmail(user, getCreditCard(user));
+            Optional<Membership> membership = membershipService.getMembership(user);
+            emailService.get().sendCreditCardUpdateEmail(user, membership);
         }
+
     }
 
     public Optional<CreditCard> getCreditCard(MikvahUser user) {

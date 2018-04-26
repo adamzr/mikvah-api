@@ -14,6 +14,7 @@ import org.lamikvah.website.data.MikvahUser;
 import org.lamikvah.website.data.Plan;
 import org.lamikvah.website.exception.ServerErrorException;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 
 import com.stripe.exception.APIConnectionException;
@@ -34,9 +35,15 @@ public class MembershipService {
     private static final int MEMBERSHIP_LENGTH = 1;
     @Autowired private MembershipRepository membershipRepository;
     @Autowired private MikvahUserRepository userRepository;
-    @Autowired private EmailService emailService;
+    @Autowired @Lazy private Optional<EmailService> emailService;
 
     private static final String ERROR_MESSAGE = "There was a problem handling your membership payment. Please try again later.";
+
+    public Optional<Membership> getMembership(MikvahUser user) {
+
+        return membershipRepository.findByMikvahUser(user);
+
+    }
 
     public Membership createOfflineMembership(MikvahUser user, Plan plan) {
 
@@ -138,9 +145,9 @@ public class MembershipService {
                     userRepository.save(user);
 
                     if(isNewMembership) {
-                        emailService.sendNewMemberEmail(user, membership);
+                        emailService.get().sendNewMemberEmail(user, membership);
                     } else {
-                        emailService.sendMembershipRenewalEmail(user, membership);
+                        emailService.get().sendMembershipRenewalEmail(user, membership);
                     }
 
                     log.info("Activated membership for user with id={} based on invoice={}", user.getId(), invoice.getId());
@@ -171,7 +178,7 @@ public class MembershipService {
         user.setMember(false);
         userRepository.save(user);
 
-        emailService.sendMembershipEndedEmail(user);
+        emailService.get().sendMembershipEndedEmail(user);
 
         log.info("Cancelled membership for user with id={} subscription={}.", user.getId(), subscription.getId());
         return;
@@ -189,7 +196,7 @@ public class MembershipService {
                 subscription.cancel(params);
                 membership.setAutoRenewEnabled(false);
                 membershipRepository.save(membership);
-                emailService.sendAutoRenewDisabledEmail(user);
+                emailService.get().sendAutoRenewDisabledEmail(user, membership);
             }
         }
     }
@@ -216,7 +223,7 @@ public class MembershipService {
                 membership.setAutoRenewEnabled(true);
                 membershipRepository.save(membership);
 
-                emailService.sendAutoRenewEnabledEmail(user);
+                emailService.get().sendAutoRenewEnabledEmail(user, membership);
             }
         }
     }

@@ -109,10 +109,11 @@ public class AppointmentService {
     @Transactional(isolation = Isolation.SERIALIZABLE, timeout = 10)
     public Optional<String> cancelAppointment(MikvahUser user, long slotId) {
 
-        AppointmentSlot slot = appointmentSlotRepository.findOne(slotId);
-        if(slot == null) {
+        Optional<AppointmentSlot> existingSlot = appointmentSlotRepository.findById(slotId);
+        if(!existingSlot.isPresent()) {
             return Optional.empty();
         }
+        AppointmentSlot slot = existingSlot.get();
         if(slot.getMikvahUser() == null) {
             return Optional.empty();
         }

@@ -24,6 +24,7 @@ import org.lamikvah.website.data.UserDto;
 import org.lamikvah.website.data.UserRequestDto;
 import org.lamikvah.website.exception.ServerErrorException;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 
@@ -41,7 +42,7 @@ public class MikvahUserService {
     @Autowired private CreditCardService creditCardService;
     @Autowired private AppointmentSlotRepository appointmentSlotRepository;
     @Autowired private MembershipRepository membershipRepository;
-    @Autowired private EmailService emailService;
+    @Autowired @Lazy private Optional<EmailService> emailService;
 
     private ManagementAPI auth0ManagementApi = new ManagementAPI("{YOUR_DOMAIN}", "{YOUR_API_TOKEN}");
 
@@ -111,7 +112,7 @@ public class MikvahUserService {
                 MikvahUser newUser = new MikvahUser();
                 newUser.setAuth0UserId(auth0UserId);
                 newUser.setEmail(email);
-                emailService.sendWelcomeEmail(newUser);
+                emailService.get().sendWelcomeEmail(newUser);
                 return userRepository.save(newUser);
             } else {
                 MikvahUser partialUser = user.get();

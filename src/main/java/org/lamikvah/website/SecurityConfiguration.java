@@ -1,9 +1,7 @@
 package org.lamikvah.website;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.actuate.autoconfigure.ManagementServerProperties;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.builders.WebSecurity;
@@ -14,13 +12,13 @@ import com.auth0.spring.security.api.JwtWebSecurityConfigurer;
 
 @EnableWebSecurity
 @Configuration
-@Order(ManagementServerProperties.ACCESS_OVERRIDE_ORDER)
 public class SecurityConfiguration extends WebSecurityConfigurerAdapter {
 
     @Autowired private MikvahConfiguration config;
 
     @Override
     protected void configure(HttpSecurity http) throws Exception {
+
         JwtWebSecurityConfigurer
                 .forRS256(config.getAuth0().getApiAudience(), config.getAuth0().getIssuer())
                 .configure(http)
@@ -39,15 +37,18 @@ public class SecurityConfiguration extends WebSecurityConfigurerAdapter {
                 .antMatchers(HttpMethod.POST, "/webhook").permitAll()
                 .antMatchers(HttpMethod.GET, "/attendent-daily-list").permitAll()
                 .anyRequest().authenticated();
+
     }
 
     @Override
     public void configure(WebSecurity web) throws Exception {
+
         web
         .ignoring()
             .antMatchers(HttpMethod.GET, "/hours")
             .antMatchers(HttpMethod.POST, "/donate")
             .antMatchers(HttpMethod.GET, "/appointments/availability");
+
     }
 
 
