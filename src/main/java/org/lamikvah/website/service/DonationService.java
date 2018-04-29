@@ -4,7 +4,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.lamikvah.website.data.MikvahUser;
-import org.lamikvah.website.exception.AppointmentCreationException;
+import org.lamikvah.website.exception.DonationPaymentException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -36,13 +36,13 @@ public class DonationService {
         }
         try {
             Charge charge = Charge.create(chargeParams);
-            log.info("User with id={} donated amount={} USD with charge ID={}", user.getId(), amount, charge.getId());
+            log.info("User with id={} donated amount={} USD with charge ID={}", user != null ? user.getId() : "N/A", amount, charge.getId());
         } catch (AuthenticationException | InvalidRequestException | APIConnectionException | APIException e) {
             log.error("Payment processing error.", e);
-            throw new AppointmentCreationException("There was a problem processing your payment. Please try again later.");
+            throw new DonationPaymentException("There was a problem processing your payment. Please try again later.", e);
         }  catch (CardException e) {
             log.info("Card processing error.", e);
-            throw new AppointmentCreationException("There was a problem processing your payment. " + e.getLocalizedMessage());
+            throw new DonationPaymentException("There was a problem processing your payment. " + e.getLocalizedMessage());
         }
 
         emailService.sendDonationEmail(user, amount);

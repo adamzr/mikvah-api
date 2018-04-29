@@ -43,6 +43,7 @@ public class AppointmentController {
 
     @PostMapping("/appointments")
     public AppointmentCreationResponse createAppointment(@RequestBody AppointmentRequest appointmentRequest, HttpServletRequest request) {
+
         MikvahUser user = mikvahUserService.getUser(request);
         try {
             AppointmentSlotDto slot = appointmentService.createAppointment(appointmentRequest,

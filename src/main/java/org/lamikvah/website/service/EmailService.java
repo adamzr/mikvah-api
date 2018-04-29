@@ -237,7 +237,9 @@ public class EmailService {
             sendEmail(user, htmlMustache, txtMustache, context, "Membership Automatic Renewal Disabled");
 
         } catch (Exception e) {
+            
             log.error("There was a problem sending the mikvah membership auto-renew disabled email.", e);
+            
         }
     }
 
@@ -255,7 +257,9 @@ public class EmailService {
             sendEmail(user, htmlMustache, txtMustache, context, "Membership Automatic Renewal Enabled");
 
         } catch (Exception e) {
+            
             log.error("There was a problem sending the mikavh membership auto-reneal enabled email.", e);
+            
         }
 
     }
@@ -342,11 +346,13 @@ public class EmailService {
             context.put("name", user.getFullName());
             context.put(AMOUNT, formattedAmount);
             context.put("date", FRIENDLY_FORMAT.format(LocalDateTime.now()));
-            sendEmail("Mikvah Treasurer", "liz@edmunds.com", htmlMustache, txtMustache, context,
+            sendEmail("Mikvah Treasurer", config.getMikvahTreasurerEmail(), htmlMustache, txtMustache, context,
                     "Donation Notification");
 
         } catch (Exception e) {
+
             log.error("There was a problem sending the donation notification email.", e);
+
         }
 
     }
@@ -354,17 +360,8 @@ public class EmailService {
     private void sendEmail(MikvahUser user, Mustache htmlMustache, Mustache txtMustache, Map<String, Object> context,
             String subject) {
 
-        StringWriter htmlWriter = new StringWriter();
-        StringWriter txtWriter = new StringWriter();
+        sendEmail(user.getFullName(), user.getEmail(), htmlMustache, txtMustache, context, subject);
 
-        htmlMustache.execute(htmlWriter, context);
-        txtMustache.execute(txtWriter, context);
-
-        Email email = EmailBuilder.startingBlank().from("Los Angeles Mikvah Society", "mikvah@mikvah.email")
-                .to(user.getFullName(), user.getEmail()).withSubject(subject).withPlainText(txtWriter.toString())
-                .withHTMLText(htmlWriter.toString()).buildEmail();
-
-        mailer.sendMail(email, true);
     }
 
     private void sendEmail(String name, String emailAddress, Mustache htmlMustache, Mustache txtMustache,
@@ -376,8 +373,11 @@ public class EmailService {
         htmlMustache.execute(htmlWriter, context);
         txtMustache.execute(txtWriter, context);
 
-        Email email = EmailBuilder.startingBlank().from("Los Angeles Mikvah Society", "mikvah@mikvah.email")
-                .to(name, emailAddress).withSubject(subject).withPlainText(txtWriter.toString())
+        Email email = EmailBuilder.startingBlank()
+                .from("Los Angeles Mikvah Society", config.getFromEmailAddress())
+                .to(name, emailAddress)
+                .withSubject(subject)
+                .withPlainText(txtWriter.toString())
                 .withHTMLText(htmlWriter.toString()).buildEmail();
 
         mailer.sendMail(email, true);

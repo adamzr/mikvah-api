@@ -9,7 +9,6 @@ import org.lamikvah.website.data.Membership;
 import org.lamikvah.website.data.MikvahUser;
 import org.lamikvah.website.exception.ServerErrorException;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
@@ -76,6 +75,7 @@ public class CreditCardService {
     }
 
     public Optional<CreditCard> getCreditCard(MikvahUser user) {
+
         if(StringUtils.isEmpty(user.getStripeCustomerId())) {
             return Optional.empty();
         }
@@ -103,28 +103,34 @@ public class CreditCardService {
     }
 
     private void createCard(MikvahUser user, String token) throws AuthenticationException, InvalidRequestException, APIConnectionException, CardException, APIException {
+
         String customerId = user.getStripeCustomerId();
         Customer customer = Customer.retrieve(customerId);
         Map<String, Object> params = new HashMap<>();
         params.put("source", token);
         ExternalAccount source = customer.getSources().create(params);
         setDefaultCard(customerId, source.getId());
+
     }
 
     private void setDefaultCard(String customerId, String sourceId) throws AuthenticationException, InvalidRequestException, APIConnectionException, CardException, APIException {
+
         Customer customer = Customer.retrieve(customerId);
         Map<String, Object> params = new HashMap<>();
         params.put("default_source", sourceId);
         customer.update(params);
+
     }
 
     private void createCustomer(MikvahUser user) throws AuthenticationException, InvalidRequestException, APIConnectionException, CardException, APIException {
+
         Map<String, Object> customerParams = new HashMap<>();
         customerParams.put("description", (user.getTitle() + " " + user.getFirstName() + " " + user.getLastName()).trim());
         customerParams.put("email", user.getEmail());
         Customer customer = Customer.create(customerParams);
         user.setStripeCustomerId(customer.getId());
         mikvahUserService.saveUser(user);
+
     }
 
 }

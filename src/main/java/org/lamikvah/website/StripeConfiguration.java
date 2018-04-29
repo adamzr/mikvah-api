@@ -12,8 +12,10 @@ import lombok.extern.slf4j.Slf4j;
 public class StripeConfiguration {
 
     public StripeConfiguration(@Autowired MikvahConfiguration config) {
+
         log.info("Initializing Stripe...");
         Stripe.apiKey = config.getStripe().getApiSecret();
+
     }
 
 }

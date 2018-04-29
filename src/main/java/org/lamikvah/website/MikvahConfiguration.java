@@ -26,6 +26,10 @@ public class MikvahConfiguration {
 
     private String timeZone;
 
+    private String mikvahTreasurerEmail = "adamzr+liz@gmail.com";//"liz@edmunds.com";
+
+    private String fromEmailAddress = "mikvah@mikvah.email";
+
     @Data
     public static class Auth0Properties {
 

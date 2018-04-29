@@ -60,15 +60,18 @@ public class AppointmentService {
     private EmailService emailService;
 
     public List<LocalDateTime> getAvailableTimes() {
+
         LocalDateTime start = LocalDateTime.now(Clock.system(ZoneId.of(config.getTimeZone())));
         LocalDateTime end = start.plusDays(8);
         List<AppointmentSlot> slots = appointmentSlotRepository.findByStartBetweenAndMikvahUserOrderByStartAsc(start,
                 end, null);
         return slots.stream().map(AppointmentSlot::getStart).distinct().sorted().collect(Collectors.toList());
+
     }
 
     @Transactional(isolation = Isolation.SERIALIZABLE, timeout = 10)
     public AppointmentSlotDto createAppointment(AppointmentRequest appointmentRequest, MikvahUser user) {
+
         Optional<String> stripeChargeId = handleUserPayment(user);
 
         LocalDateTime requestedTime = appointmentRequest.getTime();
@@ -189,15 +192,16 @@ public class AppointmentService {
         List<AppointmentSlot> todaysSlots = appointmentSlotRepository.findByStartBetweenOrderByStartAsc(now.toLocalDate().atStartOfDay(), now.toLocalDate().atTime(LocalTime.MAX));
         return todaysSlots.stream()
                 .filter(slot -> slot.getMikvahUser() != null)
-                .map(slot -> {
-                    return AttendentAppointmentView.builder()
+                .map(slot ->
+                        AttendentAppointmentView.builder()
                             .firstName(slot.getMikvahUser().getFirstName())
                             .time(slot.getStart().toLocalTime().format(TIME_FORMAT))
                             .notes(slot.getNotes())
-                            .build();
-                })
+                            .build()
+                        )
                 .sorted(Comparator.comparing(AttendentAppointmentView::getTime))
                 .collect(Collectors.toList());
 
     }
+
 }

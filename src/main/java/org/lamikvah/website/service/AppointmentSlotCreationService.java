@@ -29,7 +29,7 @@ public class AppointmentSlotCreationService {
 
     private static final int APPOINTMENT_LENGTH = 30;
     private static final long ONE_HOUR = 3600000;
-    private static final long FIVE_MINUTES = 300000;
+    private static final long TEN_MINUTES = 600000;
 
     private static final List<Integer> APPOINTMENT_ROOMS_OFFSETS = Arrays.asList(0, 15);
 
@@ -42,7 +42,7 @@ public class AppointmentSlotCreationService {
     @Autowired
     private MikvahConfiguration config;
 
-    @Scheduled(initialDelay = FIVE_MINUTES, fixedRate=ONE_HOUR)
+    @Scheduled(initialDelay = TEN_MINUTES, fixedRate=ONE_HOUR)
     public void createSlots() {
 
         log.debug("Creating appointment slots.");

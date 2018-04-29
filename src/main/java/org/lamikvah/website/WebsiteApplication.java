@@ -19,14 +19,18 @@ import lombok.extern.slf4j.Slf4j;
 public class WebsiteApplication {
 
     public static void main(String[] args) {
+
         SpringApplication.run(WebsiteApplication.class, args);
+
     }
 
     @Bean
     public TaskScheduler taskScheduler() {
+
         ThreadPoolTaskScheduler scheduler = new ThreadPoolTaskScheduler();
         scheduler.setErrorHandler(e -> log.error("Got exception during scheduled process.", e));
         return scheduler;
+
     }
 
 }

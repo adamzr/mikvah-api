@@ -36,6 +36,7 @@ public class SecurityConfiguration extends WebSecurityConfigurerAdapter {
                 .antMatchers(HttpMethod.GET, "/info").permitAll()
                 .antMatchers(HttpMethod.POST, "/webhook").permitAll()
                 .antMatchers(HttpMethod.GET, "/attendent-daily-list").permitAll()
+                .antMatchers(HttpMethod.GET, "/health").permitAll()
                 .anyRequest().authenticated();
 
     }
@@ -46,7 +47,7 @@ public class SecurityConfiguration extends WebSecurityConfigurerAdapter {
         web
         .ignoring()
             .antMatchers(HttpMethod.GET, "/hours")
-            .antMatchers(HttpMethod.POST, "/donate")
+//            .antMatchers(HttpMethod.POST, "/donate")
             .antMatchers(HttpMethod.GET, "/appointments/availability");
 
     }

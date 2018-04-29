@@ -44,7 +44,7 @@ public class MikvahUserService {
     @Autowired private MembershipRepository membershipRepository;
     @Autowired @Lazy private Optional<EmailService> emailService;
 
-    private ManagementAPI auth0ManagementApi = new ManagementAPI("{YOUR_DOMAIN}", "{YOUR_API_TOKEN}");
+    private final ManagementAPI auth0ManagementApi;
 
     private static final UserFilter NO_OP_USER_FILTER = new UserFilter();
 
@@ -87,6 +87,7 @@ public class MikvahUserService {
     }
 
     public MikvahUser getUser(HttpServletRequest request){
+
         Principal principal = request.getUserPrincipal();
         String auth0UserId =  principal.getName();
         try {
@@ -95,6 +96,7 @@ public class MikvahUserService {
             throw new ServerErrorException("There was a problem getting your user information. Please try again later.",
                     e);
         }
+
     }
 
     public UserDto getUserWithCreditCardInfo(String auth0UserId) throws Auth0Exception {
