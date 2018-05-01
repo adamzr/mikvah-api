@@ -237,9 +237,9 @@ public class EmailService {
             sendEmail(user, htmlMustache, txtMustache, context, "Membership Automatic Renewal Disabled");
 
         } catch (Exception e) {
-            
+
             log.error("There was a problem sending the mikvah membership auto-renew disabled email.", e);
-            
+
         }
     }
 
@@ -257,9 +257,9 @@ public class EmailService {
             sendEmail(user, htmlMustache, txtMustache, context, "Membership Automatic Renewal Enabled");
 
         } catch (Exception e) {
-            
+
             log.error("There was a problem sending the mikavh membership auto-reneal enabled email.", e);
-            
+
         }
 
     }
@@ -316,7 +316,7 @@ public class EmailService {
     }
 
     @Async
-    public void sendDonationEmail(MikvahUser user, double amount) {
+    public void sendDonationEmail(String name, String email, double amount) {
 
         String formattedAmount = NumberFormat.getCurrencyInstance().format(amount);
         // Receipt to donor
@@ -326,11 +326,11 @@ public class EmailService {
             Mustache txtMustache = mustacheTemplateCache.get("emails/donation-receipt.txt.mustache");
 
             Map<String, Object> context = new HashMap<>();
-            context.put("name", user.getFullName());
+            context.put("name", name);
             context.put(AMOUNT, formattedAmount);
             context.put("date", FRIENDLY_FORMAT.format(LocalDateTime.now()));
 
-            sendEmail(user, htmlMustache, txtMustache, context, "Donation Receipt");
+            sendEmail(name, email, htmlMustache, txtMustache, context, "Donation Receipt");
 
         } catch (Exception e) {
             log.error("There was a problem sending the donation receipt email.", e);
@@ -343,7 +343,7 @@ public class EmailService {
             Mustache txtMustache = mustacheTemplateCache.get("emails/donation-notification.txt.mustache");
 
             Map<String, Object> context = new HashMap<>();
-            context.put("name", user.getFullName());
+            context.put("name", name);
             context.put(AMOUNT, formattedAmount);
             context.put("date", FRIENDLY_FORMAT.format(LocalDateTime.now()));
             sendEmail("Mikvah Treasurer", config.getMikvahTreasurerEmail(), htmlMustache, txtMustache, context,

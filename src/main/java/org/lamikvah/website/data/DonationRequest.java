@@ -9,4 +9,8 @@ public class DonationRequest {
 
     private String token;
 
+    private String name;
+
+    private String email;
+
 }

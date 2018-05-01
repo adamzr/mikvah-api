@@ -32,7 +32,7 @@ public class DonationController {
             log.info("No user on donation request.");
         }
 
-        donationService.donate(user, donationRequest.getAmount(), donationRequest.getToken());
+        donationService.donate(user, donationRequest.getName(), donationRequest.getEmail(), donationRequest.getAmount(), donationRequest.getToken());
 
         return MessageResponse.builder()
                 .success(true)

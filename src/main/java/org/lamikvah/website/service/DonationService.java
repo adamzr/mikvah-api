@@ -23,7 +23,7 @@ public class DonationService {
 
     @Autowired private EmailService emailService;
 
-    public void donate(MikvahUser user, double amount, String stripeToken) {
+    public void donate(MikvahUser user, String name, String email, double amount, String stripeToken) {
 
         // Charge the user's card:
         Map<String, Object> chargeParams = new HashMap<>();
@@ -45,7 +45,9 @@ public class DonationService {
             throw new DonationPaymentException("There was a problem processing your payment. " + e.getLocalizedMessage());
         }
 
-        emailService.sendDonationEmail(user, amount);
+        String to = user != null ? user.getFullName() : name;
+        String emailAddress = user != null ? user.getEmail() : email;
+        emailService.sendDonationEmail(to, emailAddress, amount);
 
     }
 
