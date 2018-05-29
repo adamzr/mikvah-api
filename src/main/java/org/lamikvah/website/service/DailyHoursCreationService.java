@@ -99,7 +99,7 @@ public class DailyHoursCreationService {
 
         if(dayContext.isLeilShabbosOrLeilYomTov()) {
             hours.setClosed(false);
-            LocalTime opening = dayContext.getCandleLighting().plusHours(1);
+            LocalTime opening = roundToNextTimeEndingIn5or0(dayContext.getCandleLighting().plusHours(1));
             hours.setOpening(Time.valueOf(opening));
             hours.setClosing(Time.valueOf(opening.plusMinutes(30)));
             return hours;
@@ -107,7 +107,7 @@ public class DailyHoursCreationService {
 
         if(dayContext.isMotzeiYomKippur()) {
             hours.setClosed(false);
-            LocalTime opening = dayContext.getTzeis().plusHours(1);
+            LocalTime opening = roundToNextTimeEndingIn5or0(dayContext.getTzeis().plusHours(1));
             hours.setOpening(Time.valueOf(opening));
             hours.setClosing(calculateClosing(opening));
             return hours;
@@ -115,7 +115,7 @@ public class DailyHoursCreationService {
 
         if(dayContext.isLeilPurim()) {
             hours.setClosed(false);
-            LocalTime opening = dayContext.getLatestTzeisForWeekRoundedUpToNearestFiveMinutes().plusHours(1);
+            LocalTime opening = roundToNextTimeEndingIn5or0(dayContext.getLatestTzeisForWeekRoundedUpToNearestFiveMinutes().plusHours(1));
             hours.setOpening(Time.valueOf(opening));
             hours.setClosing(calculateClosing(opening));
             return hours;
@@ -123,7 +123,7 @@ public class DailyHoursCreationService {
 
         if(dayContext.isMotzeiShabbosOrMotzeiYomTov()) {
             hours.setClosed(false);
-            LocalTime opening = dayContext.getTzeis().plusMinutes(45);
+            LocalTime opening = roundToNextTimeEndingIn5or0(dayContext.getTzeis().plusMinutes(45));
             hours.setOpening(Time.valueOf(opening));
             hours.setClosing(calculateClosing(opening));
             return hours;
@@ -198,16 +198,21 @@ public class DailyHoursCreationService {
             }
         }
 
-        // Round to next 5 minutes
-        int minutesMod5 = latestTzais.getMinute() % 5;
-        if(minutesMod5 != 0) {
-            latestTzais = latestTzais.plusMinutes(5L - minutesMod5);
-        }
-
-        latestTzais = latestTzais.truncatedTo(ChronoUnit.MINUTES);
+        latestTzais = roundToNextTimeEndingIn5or0(latestTzais);
 
         return latestTzais;
 
+    }
+
+    private LocalTime roundToNextTimeEndingIn5or0(LocalTime time) {
+        LocalTime adjusted = time;
+        int minutesMod5 = time.getMinute() % 5;
+        if(minutesMod5 != 0) {
+            adjusted = time.plusMinutes(5L - minutesMod5);
+        }
+
+        adjusted = adjusted.truncatedTo(ChronoUnit.MINUTES);
+        return adjusted;
     }
 
     private boolean isLeilYomTovOrShabbos(LocalDate date, JewishCalendar nextDay) {
