@@ -41,4 +41,23 @@ public class DonationController {
 
     }
 
+    @PostMapping("/donate-guest")
+    public MessageResponse guestDonate(@RequestBody DonationRequest donationRequest, HttpServletRequest httpRequest) {
+
+        MikvahUser user = null;
+        try {
+            user = userService.getUser(httpRequest);
+        } catch (Exception e) {
+            log.info("No user on donation request.");
+        }
+
+        donationService.donate(user, donationRequest.getName(), donationRequest.getEmail(), donationRequest.getAmount(), donationRequest.getToken());
+
+        return MessageResponse.builder()
+                .success(true)
+                .message("Thank you for your donation!")
+                .build();
+
+    }
+
 }

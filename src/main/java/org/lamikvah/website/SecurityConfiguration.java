@@ -47,7 +47,7 @@ public class SecurityConfiguration extends WebSecurityConfigurerAdapter {
         web
         .ignoring()
             .antMatchers(HttpMethod.GET, "/hours")
-//            .antMatchers(HttpMethod.POST, "/donate")
+            .antMatchers(HttpMethod.POST, "/donate-guest")
             .antMatchers(HttpMethod.GET, "/appointments/availability");
 
     }
