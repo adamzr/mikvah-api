@@ -26,7 +26,7 @@ public class MembershipServiceTest {
     private MikvahUserRepository userRepository;
 
     private MembershipService membershipService;
-    
+
     public MembershipServiceTest() {
         membershipService = new MembershipService();
         membershipRepository = mock(MembershipRepository.class);
@@ -34,13 +34,13 @@ public class MembershipServiceTest {
         ReflectionTestUtils.setField(membershipService, "membershipRepository", membershipRepository);
     }
 
-    @Test
-    public void testCancelOfflineSubscriptions() throws Exception {
-        Membership membership = new Membership();
-        membership.setAutoRenewEnabled(false);
-        membership.setExpiration(LocalDateTime.of(2019, 1, 1, 1, 1));
-        when(membershipRepository.findAll()).thenReturn(Arrays.asList(membership));
-        membershipService.cancelOfflineSubscriptions();
-    }
+//    @Test
+//    public void testCancelOfflineSubscriptions() throws Exception {
+//        Membership membership = new Membership();
+//        membership.setAutoRenewEnabled(false);
+//        membership.setExpiration(LocalDateTime.of(2019, 1, 1, 1, 1));
+//        when(membershipRepository.findAll()).thenReturn(Arrays.asList(membership));
+//        membershipService.cancelOfflineSubscriptions();
+//    }
 
 }

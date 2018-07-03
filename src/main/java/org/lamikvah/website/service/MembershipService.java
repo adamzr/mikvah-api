@@ -191,32 +191,32 @@ public class MembershipService {
 
     }
 
-    @Scheduled(initialDelay = NONE, fixedRate = TWENTY_FOUR_HOURS)
-    public void cancelOfflineSubscriptions() {
-
-        log.info("Checking for non-Stripe managed memberships...");
-
-        LocalDateTime sevenDaysFromNow = LocalDateTime.now().plusDays(7);
-        List<Membership> membershipsToCancel = new ArrayList<>();
-
-        for(Membership membership: membershipRepository.findAll()) {
-            if(!membership.isAutoRenewEnabled()
-                    && membership.getExpiration().isBefore(sevenDaysFromNow)) {
-                log.info("Canceling membership {}", membership);
-                membershipsToCancel.add(membership);
-                MikvahUser user = membership.getMikvahUser();
-                if(user != null) {
-                    emailService.get().sendMembershipEndedEmail(membership.getMikvahUser());
-                    membershipsToCancel.add(membership);
-                    user.setMember(false);
-                    userRepository.save(user);
-                }
-            }
-        }
-
-        membershipRepository.deleteAll(membershipsToCancel);
-
-    }
+//    @Scheduled(initialDelay = NONE, fixedRate = TWENTY_FOUR_HOURS)
+//    public void cancelOfflineSubscriptions() {
+//
+//        log.info("Checking for non-Stripe managed memberships...");
+//
+//        LocalDateTime sevenDaysFromNow = LocalDateTime.now().plusDays(7);
+//        List<Membership> membershipsToCancel = new ArrayList<>();
+//
+//        for(Membership membership: membershipRepository.findAll()) {
+//            if(!membership.isAutoRenewEnabled()
+//                    && membership.getExpiration().isBefore(sevenDaysFromNow)) {
+//                log.info("Canceling membership {}", membership);
+//                membershipsToCancel.add(membership);
+//                MikvahUser user = membership.getMikvahUser();
+//                if(user != null) {
+//                    emailService.get().sendMembershipEndedEmail(membership.getMikvahUser());
+//                    membershipsToCancel.add(membership);
+//                    user.setMember(false);
+//                    userRepository.save(user);
+//                }
+//            }
+//        }
+//
+//        membershipRepository.deleteAll(membershipsToCancel);
+//
+//    }
 
     public void disableAutoRenew(MikvahUser user) throws AuthenticationException, InvalidRequestException, APIConnectionException, CardException, APIException {
         Optional<Membership> membershipOptional = membershipRepository.findByMikvahUser(user);
