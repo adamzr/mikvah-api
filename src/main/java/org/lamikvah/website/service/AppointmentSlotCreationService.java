@@ -31,7 +31,7 @@ public class AppointmentSlotCreationService {
     private static final long ONE_HOUR = 3600000;
     private static final long TEN_MINUTES = 600000;
 
-    private static final List<Integer> APPOINTMENT_ROOMS_OFFSETS = Arrays.asList(0, 15);
+    private static final List<Integer> APPOINTMENT_ROOMS_OFFSETS = Arrays.asList(0, 5, 10, 15);
 
     @Autowired
     private AppointmentSlotRepository repo;

@@ -118,7 +118,7 @@ public class MikvahUserService {
                 return userRepository.save(newUser);
             } else {
                 MikvahUser partialUser = user.get();
-                partialUser.setEmail(email);
+                partialUser.setAuth0UserId(auth0UserId);
                 return userRepository.save(partialUser);
             }
 

@@ -3,7 +3,9 @@ package org.lamikvah.website.service;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -15,6 +17,7 @@ import org.lamikvah.website.data.Plan;
 import org.lamikvah.website.exception.ServerErrorException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import com.stripe.exception.APIConnectionException;
@@ -32,6 +35,8 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class MembershipService {
 
+    private static final int NONE = 0;
+    private static final int TWENTY_FOUR_HOURS = 86400000;
     private static final int MEMBERSHIP_LENGTH = 1;
     @Autowired private MembershipRepository membershipRepository;
     @Autowired private MikvahUserRepository userRepository;
@@ -60,6 +65,7 @@ public class MembershipService {
         return membershipRepository.save(membership);
 
     }
+
     public void createMembership(MikvahUser user, Plan plan) {
         Map<String, Object> item = new HashMap<>();
         item.put("plan", plan.getStripePlanId());
@@ -103,14 +109,14 @@ public class MembershipService {
                 if(line.getType().equalsIgnoreCase("subscription")) {
 
                     String subscriptionId = line.getId();
-                    Optional<Membership> membershipOptional = membershipRepository.findByStripeSubscriptionId(subscriptionId);
+                    Optional<Membership> membershipForSubscriptionOptional = membershipRepository.findByStripeSubscriptionId(subscriptionId);
                     Membership membership;
                     boolean isNewMembership = false;
 
-                    if(membershipOptional.isPresent()) {
-
-                        membership = membershipOptional.get();
-                        isNewMembership = true;
+                    if(membershipForSubscriptionOptional.isPresent()) {
+                        // This is a renewal of an existing membership
+                        membership = membershipForSubscriptionOptional.get();
+                        isNewMembership = false;
 
                     } else {
 
@@ -182,6 +188,27 @@ public class MembershipService {
 
         log.info("Cancelled membership for user with id={} subscription={}.", user.getId(), subscription.getId());
         return;
+
+    }
+
+    @Scheduled(initialDelay = NONE, fixedRate = TWENTY_FOUR_HOURS)
+    public void cancelOfflineSubscriptions() {
+
+        log.info("Checking for non-Stripe managed memberships...");
+
+        LocalDateTime sevenDaysFromNow = LocalDateTime.now().plusDays(7);
+        List<Membership> membershipsToCancel = new ArrayList<>();
+
+        for(Membership membership: membershipRepository.findAll()) {
+            if(!membership.isAutoRenewEnabled()
+                    && membership.getExpiration().isAfter(sevenDaysFromNow)) {
+                log.info("Canceling membership {}", membership);
+                emailService.get().sendMembershipEndedEmail(membership.getMikvahUser());
+                membershipsToCancel.add(membership);
+            }
+        }
+
+        membershipRepository.deleteAll(membershipsToCancel);
 
     }
 
