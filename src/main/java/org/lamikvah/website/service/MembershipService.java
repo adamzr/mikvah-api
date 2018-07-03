@@ -201,10 +201,16 @@ public class MembershipService {
 
         for(Membership membership: membershipRepository.findAll()) {
             if(!membership.isAutoRenewEnabled()
-                    && membership.getExpiration().isAfter(sevenDaysFromNow)) {
+                    && membership.getExpiration().isBefore(sevenDaysFromNow)) {
                 log.info("Canceling membership {}", membership);
-                emailService.get().sendMembershipEndedEmail(membership.getMikvahUser());
                 membershipsToCancel.add(membership);
+                MikvahUser user = membership.getMikvahUser();
+                if(user != null) {
+                    emailService.get().sendMembershipEndedEmail(membership.getMikvahUser());
+                    membershipsToCancel.add(membership);
+                    user.setMember(false);
+                    userRepository.save(user);
+                }
             }
         }
 
