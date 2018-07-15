@@ -7,9 +7,13 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+
+import javax.mail.internet.MimeMessage.RecipientType;
 
 import org.lamikvah.website.MikvahConfiguration;
 import org.lamikvah.website.dao.MikvahUserRepository;
@@ -19,6 +23,7 @@ import org.lamikvah.website.data.Membership;
 import org.lamikvah.website.data.MikvahUser;
 import org.simplejavamail.email.Email;
 import org.simplejavamail.email.EmailBuilder;
+import org.simplejavamail.email.Recipient;
 import org.simplejavamail.mailer.Mailer;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Async;
@@ -162,7 +167,8 @@ public class EmailService {
                 context.put(LAST4, "XXXX");
             }
             context.put("autoRenewEnabled", membership.isAutoRenewEnabled());
-
+            context.put("date", FRIENDLY_FORMAT.format(LocalDateTime.now()));
+            context.put(AMOUNT, membership.getPlan().getFormattedPrice());
             sendEmail(user, htmlMustache, txtMustache, context, "Mikvah Membership");
 
         } catch (Exception e) {
@@ -170,6 +176,8 @@ public class EmailService {
             log.error("There was a problem sending the mikvah membership start email.", e);
 
         }
+
+        sendMembershipPaymentNotificationEmail(user.getFullName(), membership.getPlan().getFormattedPrice());
 
     }
 
@@ -191,6 +199,8 @@ public class EmailService {
                 context.put(LAST4, "XXXX");
             }
             context.put("autoRenewEnabled", membership.isAutoRenewEnabled());
+            context.put("date", FRIENDLY_FORMAT.format(LocalDateTime.now()));
+            context.put(AMOUNT, membership.getPlan().getFormattedPrice());
 
             sendEmail(user, htmlMustache, txtMustache, context, "Mikvah Membership Renewal");
 
@@ -199,6 +209,8 @@ public class EmailService {
             log.error("There was a problem sending the mikvah membership renewal email.", e);
 
         }
+
+        sendMembershipPaymentNotificationEmail(user.getFullName(), membership.getPlan().getFormattedPrice());
 
     }
 
@@ -287,6 +299,7 @@ public class EmailService {
             String formattedRenewalDate = FRIENDLY_FORMAT.format(renewalDate);
 
             context.put("renewalDate", formattedRenewalDate);
+            context.put(AMOUNT, currencyFormatter.format(upcomingInvoice.getAmountDue() / CENTS_PER_DOLLAR));
 
             sendEmail(user, htmlMustache, txtMustache, context, "Upcoming Mikvah Membership Renewal");
 
@@ -357,6 +370,30 @@ public class EmailService {
 
     }
 
+    private void sendMembershipPaymentNotificationEmail(String name, String formattedAmount) {
+        // Notification to mikvah staff
+        try {
+            Mustache htmlMustache = mustacheTemplateCache.get("emails/membership-notification.html.mustache");
+
+            Mustache txtMustache = mustacheTemplateCache.get("emails/membership-notification.txt.mustache");
+
+            Map<String, Object> context = new HashMap<>();
+            context.put("name", name);
+            context.put(AMOUNT, formattedAmount);
+            context.put("date", FRIENDLY_FORMAT.format(LocalDateTime.now()));
+            Recipient treasurer = new Recipient("Mikvah Treasurer", config.getMikvahTreasurerEmail(), RecipientType.TO);
+            Recipient membershipManager = new Recipient("Membership Manager", config.getMembershipManagerEmail(), RecipientType.TO);
+            Collection<Recipient> recipients = Arrays.asList(treasurer, membershipManager);
+            sendEmail(recipients, htmlMustache, txtMustache, context,
+                    "Donation Notification");
+
+        } catch (Exception e) {
+
+            log.error("There was a problem sending the donation notification email.", e);
+
+        }
+    }
+
     private void sendEmail(MikvahUser user, Mustache htmlMustache, Mustache txtMustache, Map<String, Object> context,
             String subject) {
 
@@ -376,6 +413,25 @@ public class EmailService {
         Email email = EmailBuilder.startingBlank()
                 .from("Los Angeles Mikvah Society", config.getFromEmailAddress())
                 .to(name, emailAddress)
+                .withSubject(subject)
+                .withPlainText(txtWriter.toString())
+                .withHTMLText(htmlWriter.toString()).buildEmail();
+
+        mailer.sendMail(email, true);
+    }
+
+    private void sendEmail(Collection<Recipient> recipients, Mustache htmlMustache, Mustache txtMustache,
+            Map<String, Object> context, String subject) {
+
+        StringWriter htmlWriter = new StringWriter();
+        StringWriter txtWriter = new StringWriter();
+
+        htmlMustache.execute(htmlWriter, context);
+        txtMustache.execute(txtWriter, context);
+
+        Email email = EmailBuilder.startingBlank()
+                .from("Los Angeles Mikvah Society", config.getFromEmailAddress())
+                .to(recipients)
                 .withSubject(subject)
                 .withPlainText(txtWriter.toString())
                 .withHTMLText(htmlWriter.toString()).buildEmail();

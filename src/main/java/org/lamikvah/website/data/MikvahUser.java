@@ -11,6 +11,7 @@ import javax.persistence.Table;
 import org.springframework.util.StringUtils;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.google.common.base.MoreObjects;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -66,7 +67,7 @@ public class MikvahUser {
 
     @JsonIgnore
     public String getFullName() {
-        String name = title + " " + firstName + " " + lastName;
+        String name = MoreObjects.firstNonNull(title, "") + " " + MoreObjects.firstNonNull(firstName, "") + " " + MoreObjects.firstNonNull(lastName, "");
         name = name.trim();
         if(StringUtils.isEmpty(name)) {
             return "Mikvah User";

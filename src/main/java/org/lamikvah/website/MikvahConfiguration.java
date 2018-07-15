@@ -28,6 +28,8 @@ public class MikvahConfiguration {
 
     private String mikvahTreasurerEmail;
 
+    private String membershipManagerEmail;
+
     private String fromEmailAddress = "mikvah@mikvah.email";
 
     @Data

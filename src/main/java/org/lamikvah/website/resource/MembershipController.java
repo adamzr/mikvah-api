@@ -8,6 +8,7 @@ import org.lamikvah.website.data.MembershipRequest;
 import org.lamikvah.website.data.MessageResponse;
 import org.lamikvah.website.data.MikvahUser;
 import org.lamikvah.website.data.Plan;
+import org.lamikvah.website.exception.AlreadyMemberException;
 import org.lamikvah.website.service.MembershipService;
 import org.lamikvah.website.service.MikvahUserService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -44,7 +45,14 @@ public class MembershipController {
 
         MikvahUser user = userService.getUser(httpRequest);
 
-        service.createMembership(user, Plan.forStripePlanName(membershipRequest.getPlan()).get());
+        try {
+            service.createMembership(user, Plan.forStripePlanName(membershipRequest.getPlan()).get());
+        } catch (AlreadyMemberException e) {
+            return MessageResponse.builder()
+                    .success(false)
+                    .message("You're already a mikvah member!")
+                    .build();
+        }
 
         return MessageResponse.builder()
                 .success(true)

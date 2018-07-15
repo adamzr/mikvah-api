@@ -72,14 +72,15 @@ public class AppointmentService {
     @Transactional(isolation = Isolation.SERIALIZABLE, timeout = 10)
     public AppointmentSlotDto createAppointment(AppointmentRequest appointmentRequest, MikvahUser user) {
 
-        Optional<String> stripeChargeId = handleUserPayment(user);
-
         LocalDateTime requestedTime = appointmentRequest.getTime();
         List<AppointmentSlot> possibleSlots = appointmentSlotRepository
                 .findByStartAndMikvahUserIsNullOrderByIdAsc(requestedTime);
         if (CollectionUtils.isEmpty(possibleSlots)) {
+            log.warn("User {} tried to make an appointment {} but there were no appoitment slots available!", user, appointmentRequest);
             throw new AppointmentCreationException("There were no available appointments for the requested time. Please try a different time.");
         }
+        Optional<String> stripeChargeId = handleUserPayment(user);
+
         AppointmentSlot slot = possibleSlots.get(0);
         slot.setMikvahUser(user);
         slot.setNotes(appointmentRequest.getNotes());
@@ -101,6 +102,8 @@ public class AppointmentService {
         reservationHistoryLogRepository.save(reservationHistoryLog);
 
         emailService.sendAppointmentConfirmationEmail(user, savedSlot);
+
+        log.info("User {} made appointment {}", user, savedSlot);
 
         return AppointmentSlotDto.builder()
                 .id(savedSlot.getId())
@@ -126,6 +129,7 @@ public class AppointmentService {
         Optional<String> refundId = Optional.empty();
         if(!StringUtils.isEmpty(slot.getStripeChargeId())) {
             refundId = refundCharge(slot.getStripeChargeId());
+            log.info("User {} was refunded for cancelled. Refund ID: ", user, refundId);
         }
         slot.setMikvahUser(null);
         slot.setStripeChargeId(null);
@@ -145,6 +149,8 @@ public class AppointmentService {
         reservationHistoryLogRepository.save(reservationHistoryLog);
 
         emailService.sendAppointmentCancellationEmail(user, slot, refundId);
+
+        log.info("User {} cancelled appointment {}", user, slot);
 
         return refundId;
     }

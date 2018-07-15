@@ -6,13 +6,13 @@ import java.util.Optional;
 
 public enum Plan {
 
-    STANDARD("standard-1"),
+    STANDARD("standard-1", "$360"),
 
-    SILVER("silver-1"),
+    SILVER("silver-1", "$500"),
 
-    GOLD("gold-1"),
+    GOLD("gold-1", "$1,000"),
 
-    PLATINUM("platinum-1");
+    CHAI("platinum-1", "$1,800");
 
     private static final Map<String, Plan> ID_TO_PLAN_MAP = new HashMap<>();
 
@@ -26,13 +26,19 @@ public enum Plan {
     }
 
     private final String stripePlanId;
+    private final String formattedPrice;
 
-    private Plan(String stripePlanId) {
+    private Plan(String stripePlanId, String formattedPrice) {
         this.stripePlanId = stripePlanId;
+        this.formattedPrice = formattedPrice;
     }
 
     public String getStripePlanId() {
         return stripePlanId;
+    }
+
+    public String getFormattedPrice() {
+        return formattedPrice;
     }
 
     public static Optional<Plan> forStripePlanName(String id) {

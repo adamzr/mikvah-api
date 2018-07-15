@@ -53,6 +53,7 @@ public class StripeWebhookController {
         switch(eventType) {
             case "invoice.upcoming":
                 Invoice upcomingInvoice = (Invoice) event.getData().getObject();
+                log.info("Sending email about upcoming membership renewal: {}", upcomingInvoice);
                 emailService.sendUpcomingRenewalEmail(upcomingInvoice);
             break;
             case "invoice.payment_succeeded":

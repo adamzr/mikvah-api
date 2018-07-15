@@ -125,7 +125,7 @@ public class CreditCardService {
     private void createCustomer(MikvahUser user) throws AuthenticationException, InvalidRequestException, APIConnectionException, CardException, APIException {
 
         Map<String, Object> customerParams = new HashMap<>();
-        customerParams.put("description", (user.getTitle() + " " + user.getFirstName() + " " + user.getLastName()).trim());
+        customerParams.put("description", user.getFullName());
         customerParams.put("email", user.getEmail());
         Customer customer = Customer.create(customerParams);
         user.setStripeCustomerId(customer.getId());

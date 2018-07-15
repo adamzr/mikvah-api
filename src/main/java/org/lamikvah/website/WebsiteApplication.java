@@ -1,5 +1,7 @@
 package org.lamikvah.website;
 
+import javax.servlet.Filter;
+
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.cache.annotation.EnableCaching;
@@ -8,6 +10,7 @@ import org.springframework.scheduling.TaskScheduler;
 import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
+import org.springframework.web.filter.ShallowEtagHeaderFilter;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -31,6 +34,11 @@ public class WebsiteApplication {
         scheduler.setErrorHandler(e -> log.error("Got exception during scheduled process.", e));
         return scheduler;
 
+    }
+
+    @Bean
+    public Filter filter(){
+        return new ShallowEtagHeaderFilter();
     }
 
 }

@@ -14,6 +14,7 @@ import org.lamikvah.website.dao.MikvahUserRepository;
 import org.lamikvah.website.data.Membership;
 import org.lamikvah.website.data.MikvahUser;
 import org.lamikvah.website.data.Plan;
+import org.lamikvah.website.exception.AlreadyMemberException;
 import org.lamikvah.website.exception.ServerErrorException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
@@ -67,6 +68,11 @@ public class MembershipService {
     }
 
     public void createMembership(MikvahUser user, Plan plan) {
+
+        if(user.isMember()) {
+            log.warn("User {} attempting to subscribe at level {} is already a member.", user, plan);
+            throw new AlreadyMemberException();
+        }
         Map<String, Object> item = new HashMap<>();
         item.put("plan", plan.getStripePlanId());
 
@@ -187,36 +193,35 @@ public class MembershipService {
         emailService.get().sendMembershipEndedEmail(user);
 
         log.info("Cancelled membership for user with id={} subscription={}.", user.getId(), subscription.getId());
-        return;
 
     }
 
-//    @Scheduled(initialDelay = NONE, fixedRate = TWENTY_FOUR_HOURS)
-//    public void cancelOfflineSubscriptions() {
-//
-//        log.info("Checking for non-Stripe managed memberships...");
-//
-//        LocalDateTime sevenDaysFromNow = LocalDateTime.now().plusDays(7);
-//        List<Membership> membershipsToCancel = new ArrayList<>();
-//
-//        for(Membership membership: membershipRepository.findAll()) {
-//            if(!membership.isAutoRenewEnabled()
-//                    && membership.getExpiration().isBefore(sevenDaysFromNow)) {
-//                log.info("Canceling membership {}", membership);
-//                membershipsToCancel.add(membership);
-//                MikvahUser user = membership.getMikvahUser();
-//                if(user != null) {
+    @Scheduled(initialDelay = NONE, fixedRate = TWENTY_FOUR_HOURS)
+    public void cancelOfflineSubscriptions() {
+
+        log.info("Checking for non-Stripe managed memberships...");
+
+        LocalDateTime sevenDaysFromNow = LocalDateTime.now().plusDays(7);
+        List<Membership> membershipsToCancel = new ArrayList<>();
+
+        for(Membership membership: membershipRepository.findAll()) {
+            if(!membership.isAutoRenewEnabled()
+                    && membership.getExpiration().isBefore(sevenDaysFromNow)) {
+                log.info("Canceling membership {}", membership);
+                membershipsToCancel.add(membership);
+                MikvahUser user = membership.getMikvahUser();
+                if(user != null) {
 //                    emailService.get().sendMembershipEndedEmail(membership.getMikvahUser());
-//                    membershipsToCancel.add(membership);
-//                    user.setMember(false);
-//                    userRepository.save(user);
-//                }
-//            }
-//        }
-//
-//        membershipRepository.deleteAll(membershipsToCancel);
-//
-//    }
+                    membershipsToCancel.add(membership);
+                    user.setMember(false);
+                    userRepository.save(user);
+                }
+            }
+        }
+
+        membershipRepository.deleteAll(membershipsToCancel);
+
+    }
 
     public void disableAutoRenew(MikvahUser user) throws AuthenticationException, InvalidRequestException, APIConnectionException, CardException, APIException {
         Optional<Membership> membershipOptional = membershipRepository.findByMikvahUser(user);
@@ -230,6 +235,7 @@ public class MembershipService {
                 membership.setAutoRenewEnabled(false);
                 membershipRepository.save(membership);
                 emailService.get().sendAutoRenewDisabledEmail(user, membership);
+                log.info("Disabled auto-renew for {}", user);
             }
         }
     }
@@ -257,6 +263,8 @@ public class MembershipService {
                 membershipRepository.save(membership);
 
                 emailService.get().sendAutoRenewEnabledEmail(user, membership);
+                log.info("Enabled auto-renew for {}", user);
+
             }
         }
     }
