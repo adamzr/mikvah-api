@@ -201,17 +201,17 @@ public class MembershipService {
 
         log.info("Checking for non-Stripe managed memberships...");
 
-        LocalDateTime sevenDaysFromNow = LocalDateTime.now().plusDays(7);
+        LocalDateTime sevenDaysAgo = LocalDateTime.now().minusDays(7);
         List<Membership> membershipsToCancel = new ArrayList<>();
 
         for(Membership membership: membershipRepository.findAll()) {
             if(!membership.isAutoRenewEnabled()
-                    && membership.getExpiration().isBefore(sevenDaysFromNow)) {
+                    && membership.getExpiration().isBefore(sevenDaysAgo)) {
                 log.info("Canceling membership {}", membership);
                 membershipsToCancel.add(membership);
                 MikvahUser user = membership.getMikvahUser();
                 if(user != null) {
-//                    emailService.get().sendMembershipEndedEmail(membership.getMikvahUser());
+                    emailService.get().sendMembershipEndedEmail(membership.getMikvahUser());
                     membershipsToCancel.add(membership);
                     user.setMember(false);
                     userRepository.save(user);
