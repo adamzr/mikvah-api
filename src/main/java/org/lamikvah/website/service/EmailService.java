@@ -357,6 +357,7 @@ public class EmailService {
 
             Map<String, Object> context = new HashMap<>();
             context.put("name", name);
+            context.put("donorEmail", email);
             context.put(AMOUNT, formattedAmount);
             context.put("date", FRIENDLY_FORMAT.format(LocalDateTime.now()));
             sendEmail("Mikvah Treasurer", config.getMikvahTreasurerEmail(), htmlMustache, txtMustache, context,

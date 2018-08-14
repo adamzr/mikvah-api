@@ -2,8 +2,11 @@ package org.lamikvah.website.service;
 
 import java.security.Principal;
 import java.time.Clock;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -16,6 +19,7 @@ import org.lamikvah.website.dao.MikvahUserRepository;
 import org.lamikvah.website.data.AppointmentSlot;
 import org.lamikvah.website.data.AppointmentSlotDto;
 import org.lamikvah.website.data.CreditCard;
+import org.lamikvah.website.data.DailyHours;
 import org.lamikvah.website.data.Membership;
 import org.lamikvah.website.data.MikvahUser;
 import org.lamikvah.website.data.Plan;
@@ -43,6 +47,7 @@ public class MikvahUserService {
     @Autowired private AppointmentSlotRepository appointmentSlotRepository;
     @Autowired private MembershipRepository membershipRepository;
     @Autowired @Lazy private Optional<EmailService> emailService;
+    @Autowired private DailyHoursService dailyHoursService;
 
     private final ManagementAPI auth0ManagementApi;
 
@@ -144,10 +149,17 @@ public class MikvahUserService {
         List<AppointmentSlot> appointments = appointmentSlotRepository.findByStartBetweenAndMikvahUserOrderByStartAsc(now, thirtyDaysFromNow, user);
         if(!CollectionUtils.isEmpty(appointments)) {
             AppointmentSlot appointment = appointments.get(appointments.size() - 1);
+            
+            LocalDate appointmentDay = appointment.getStart().toLocalDate();
+            Optional<DailyHours> hours = dailyHoursService.getHoursForDay(appointmentDay);
+            LocalTime openingTime = hours.get().getOpeningLocalTime().get();
+            ZonedDateTime lastCancellation = LocalDateTime.of(appointmentDay, openingTime).atZone(ZoneId.of(config.getTimeZone()));
+            
             currentAppointment = AppointmentSlotDto.builder()
                     .id(appointment.getId())
                     .start(appointment.getStart())
                     .build();
+            currentAppointment.setLastCancellation(lastCancellation);
         }
 
         Plan plan = null;

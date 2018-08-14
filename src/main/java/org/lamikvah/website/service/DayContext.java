@@ -17,6 +17,7 @@ public class DayContext {
     boolean isLeilShabbosOrLeilYomTov;
     boolean isMotzeiShabbosOrMotzeiYomTov;
     boolean isMotzeiYomKippur;
+    boolean isMotzeiTishaBav;
     boolean isLeilYomKippurOrLeilTishaBav;
     boolean isLeilPurim;
 

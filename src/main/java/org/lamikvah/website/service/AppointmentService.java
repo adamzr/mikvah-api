@@ -1,6 +1,7 @@
 package org.lamikvah.website.service;
 
 import java.time.Clock;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZoneId;
@@ -20,6 +21,7 @@ import org.lamikvah.website.data.AppointmentRequest;
 import org.lamikvah.website.data.AppointmentSlot;
 import org.lamikvah.website.data.AppointmentSlotDto;
 import org.lamikvah.website.data.AttendentAppointmentView;
+import org.lamikvah.website.data.DailyHours;
 import org.lamikvah.website.data.MikvahUser;
 import org.lamikvah.website.data.ReservationHistoryLog;
 import org.lamikvah.website.exception.AppointmentCreationException;
@@ -52,6 +54,9 @@ public class AppointmentService {
 
     @Autowired
     private AppointmentSlotRepository appointmentSlotRepository;
+    
+    @Autowired
+    private DailyHoursService dailyHoursService;
 
     @Autowired
     private ReservationHistoryLogRepository reservationHistoryLogRepository;
@@ -60,8 +65,19 @@ public class AppointmentService {
     private EmailService emailService;
 
     public List<LocalDateTime> getAvailableTimes() {
+        
+        LocalDateTime now = LocalDateTime.now(Clock.system(ZoneId.of(config.getTimeZone())));
+        Optional<DailyHours> hoursToday = dailyHoursService.getHoursForDay(now.toLocalDate());
+        LocalDateTime start = now;
+        if(hoursToday.isPresent()) {
+            DailyHours hours = hoursToday.get();
+            if(hours.getOpeningLocalTime().isPresent() && hours.getClosingLocalTime().isPresent()) {
+                if(hours.getOpeningLocalTime().get().isBefore(now.toLocalTime())) {
+                    start = LocalDateTime.of(now.toLocalDate(), hours.getClosingLocalTime().get().plusMinutes(1));
+                }
+            }
+        }
 
-        LocalDateTime start = LocalDateTime.now(Clock.system(ZoneId.of(config.getTimeZone())));
         LocalDateTime end = start.plusDays(8);
         List<AppointmentSlot> slots = appointmentSlotRepository.findByStartBetweenAndMikvahUserOrderByStartAsc(start,
                 end, null);
@@ -73,6 +89,22 @@ public class AppointmentService {
     public AppointmentSlotDto createAppointment(AppointmentRequest appointmentRequest, MikvahUser user) {
 
         LocalDateTime requestedTime = appointmentRequest.getTime();
+        LocalDate requestedDate = requestedTime.toLocalDate();
+        LocalDateTime now = LocalDateTime.now(ZoneId.of(config.getTimeZone()));
+        if(now.toLocalDate().isEqual(requestedDate)) {
+            // Appointment is for today
+            Optional<DailyHours> dailyHours = dailyHoursService.getHoursForDay(requestedDate);
+            if(dailyHours.isPresent()) {
+                Optional<LocalTime> openingTime = dailyHours.get().getOpeningLocalTime();
+                if(openingTime.isPresent()) {
+                    if(now.toLocalTime().isAfter(openingTime.get())) {
+                        log.info("User tried to make an appointment for today, but the mikvah is already open.");
+                        throw new AppointmentCreationException("Appointments can not be made for today once the mikvah is already open.");
+                    }
+                }
+            }
+        }
+        
         List<AppointmentSlot> possibleSlots = appointmentSlotRepository
                 .findByStartAndMikvahUserIsNullOrderByIdAsc(requestedTime);
         if (CollectionUtils.isEmpty(possibleSlots)) {
@@ -125,6 +157,21 @@ public class AppointmentService {
         }
         if(!slot.getMikvahUser().equals(user)) {
             throw new ServerErrorException("You can only cancel your own appointment.");
+        }
+        LocalDateTime now = LocalDateTime.now(ZoneId.of(config.getTimeZone()));
+        LocalDate slotDate = slot.getStart().toLocalDate();
+        if(now.toLocalDate().isEqual(slotDate)) {
+            // Appointment is for today
+            Optional<DailyHours> dailyHours = dailyHoursService.getHoursForDay(slotDate);
+            if(dailyHours.isPresent()) {
+                Optional<LocalTime> openingTime = dailyHours.get().getOpeningLocalTime();
+                if(openingTime.isPresent()) {
+                    if(now.toLocalTime().isAfter(openingTime.get())) {
+                        log.info("User tried to cancel an appointment for today, but the mikvah is already open.");
+                        throw new ServerErrorException("Appointments can not be cancelled on the day they are for once the mikvah is open.");
+                    }
+                }
+            }
         }
         Optional<String> refundId = Optional.empty();
         if(!StringUtils.isEmpty(slot.getStripeChargeId())) {

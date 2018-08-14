@@ -70,7 +70,7 @@ public class DailyHoursCreationService {
 
     }
 
-    private void calculateHoursForWeek(LocalDate sunday) {
+    public void calculateHoursForWeek(LocalDate sunday) {
 
         log.debug("Calculating hours for the week starting on {}", sunday);
 
@@ -118,6 +118,14 @@ public class DailyHoursCreationService {
             LocalTime opening = roundToNextTimeEndingIn5or0(dayContext.getLatestTzeisForWeekRoundedUpToNearestFiveMinutes().plusHours(1));
             hours.setOpening(Time.valueOf(opening));
             hours.setClosing(calculateClosing(opening));
+            return hours;
+        }
+        
+        if(dayContext.isMotzeiTishaBav()) {
+            hours.setClosed(false);
+            LocalTime opening = roundToNextTimeEndingIn5or0(dayContext.getLatestTzeisForWeekRoundedUpToNearestFiveMinutes().plusHours(1));
+            hours.setOpening(Time.valueOf(opening));
+            hours.setClosing(Time.valueOf(opening.plusHours(3)));
             return hours;
         }
 
@@ -173,6 +181,7 @@ public class DailyHoursCreationService {
                     .isLeilYomKippurOrLeilTishaBav(nextDayYomTovIndex == JewishCalendar.TISHA_BEAV || nextDayYomTovIndex == JewishCalendar.YOM_KIPPUR)
                     .isMotzeiShabbosOrMotzeiYomTov(currentDay.getDayOfWeek() == DayOfWeek.SATURDAY || YOM_TOV_INDEXES.contains(currentDayYomTovIndex))
                     .isMotzeiYomKippur(currentDayYomTovIndex == JewishCalendar.YOM_KIPPUR)
+                    .isMotzeiTishaBav(currentDayYomTovIndex == JewishCalendar.TISHA_BEAV)
                     .tzeis(convertDateToLocalTime(zmanimCalendar.getTzais()))
                     .build();
             contexts.add(context);

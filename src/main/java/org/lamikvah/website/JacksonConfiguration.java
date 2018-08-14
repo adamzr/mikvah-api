@@ -7,7 +7,9 @@ import org.springframework.http.converter.json.Jackson2ObjectMapperBuilder;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 
 @Configuration
 public class JacksonConfiguration {
@@ -18,7 +20,9 @@ public class JacksonConfiguration {
 
         ObjectMapper objectMapper = builder.createXmlMapper(false).build();
         objectMapper.findAndRegisterModules();
-        objectMapper.registerModule(new JavaTimeModule());
+        objectMapper.registerModule(new JavaTimeModule())
+        .registerModule(new ParameterNamesModule())
+        .registerModule(new Jdk8Module());
         objectMapper.configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false);
         return objectMapper;
 

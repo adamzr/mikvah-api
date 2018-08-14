@@ -36,7 +36,7 @@ public class DonationService {
         }
         try {
             Charge charge = Charge.create(chargeParams);
-            log.info("User with id={} donated amount={} USD with charge ID={}", user != null ? user.getId() : "N/A", amount, charge.getId());
+            log.info("User with id={} email={} donated amount={} USD with charge ID={}", user != null ? user.getId() : "N/A", email, amount, charge.getId());
         } catch (AuthenticationException | InvalidRequestException | APIConnectionException | APIException e) {
             log.error("Payment processing error.", e);
             throw new DonationPaymentException("There was a problem processing your payment. Please try again later.", e);
