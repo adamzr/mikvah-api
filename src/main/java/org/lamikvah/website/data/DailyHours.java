@@ -34,6 +34,10 @@ public class DailyHours {
 
     @JsonIgnore
     public Optional<LocalTime> getOpeningLocalTime() {
+        
+        if(opening == null) {
+            return Optional.empty();
+        }
 
         return Optional.ofNullable(opening.toLocalTime());
 
@@ -41,6 +45,10 @@ public class DailyHours {
 
     @JsonIgnore
     public Optional<LocalTime> getClosingLocalTime() {
+        
+        if(closing == null) {
+            return Optional.empty();
+        }
 
         return Optional.ofNullable(closing.toLocalTime());
 

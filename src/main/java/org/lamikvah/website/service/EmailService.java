@@ -83,6 +83,8 @@ public class EmailService {
             context.put("fullName", user.getFullName());
             context.put("isoStartTime", appointment.getStart().atZone(ZoneId.of(config.getTimeZone()))
                     .format(DateTimeFormatter.ISO_OFFSET_DATE_TIME));
+            context.put("isoModifiedTime", LocalDateTime.now().atZone(ZoneId.of(config.getTimeZone()))
+                    .format(DateTimeFormatter.ISO_OFFSET_DATE_TIME));
             context.put("startDateTime",
                     appointment.getStart().atZone(ZoneId.of(config.getTimeZone())).format(FRIENDLY_FORMAT));
             context.put("ccCharged", !StringUtils.isEmpty(appointment.getStripeChargeId()));
@@ -116,6 +118,8 @@ public class EmailService {
             context.put("appointmentSlotId", appointment.getId());
             context.put("fullName", user.getFullName());
             context.put("isoStartTime", appointment.getStart().atZone(ZoneId.of(config.getTimeZone()))
+                    .format(DateTimeFormatter.ISO_OFFSET_DATE_TIME));
+            context.put("isoModifiedTime", LocalDateTime.now().atZone(ZoneId.of(config.getTimeZone()))
                     .format(DateTimeFormatter.ISO_OFFSET_DATE_TIME));
             context.put("startDateTime",
                     appointment.getStart().atZone(ZoneId.of(config.getTimeZone())).format(FRIENDLY_FORMAT));

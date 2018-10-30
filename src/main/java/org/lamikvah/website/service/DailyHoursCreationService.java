@@ -49,6 +49,11 @@ public class DailyHoursCreationService {
      * Mikvah should generally not be open past 11:00 PM
      */
     private static final LocalTime LATEST_CLOSING_TIME = LocalTime.of(23, 0);
+    
+    /**
+     * Mikvah should generally not be open until at least 9:30 PM
+     */
+    private static final LocalTime EARLIEST_CLOSING_TIME = LocalTime.of(21, 30);
 
     @Autowired
     private DailyHoursRepository repo;
@@ -125,7 +130,7 @@ public class DailyHoursCreationService {
             hours.setClosed(false);
             LocalTime opening = roundToNextTimeEndingIn5or0(dayContext.getLatestTzeisForWeekRoundedUpToNearestFiveMinutes().plusHours(1));
             hours.setOpening(Time.valueOf(opening));
-            hours.setClosing(Time.valueOf(opening.plusHours(3)));
+            hours.setClosing(calculateClosing(opening));
             return hours;
         }
 
@@ -152,18 +157,22 @@ public class DailyHoursCreationService {
         }
 
         // If it overflows into the next day
-        if(threeHoursAfterOpening.getHour() < 12) {
+        if(threeHoursAfterOpening.getHour() < 12) { // is AM
             return Time.valueOf(LATEST_CLOSING_TIME);
         }
+        
+        if(threeHoursAfterOpening.isBefore(EARLIEST_CLOSING_TIME)) {
+            return Time.valueOf(EARLIEST_CLOSING_TIME);
+        }
+        
         return Time.valueOf(threeHoursAfterOpening);
     }
 
-    private List<DayContext> createDayContextsForWeek(LocalDate sunday){
+    private List<DayContext> createDayContextsForWeek(final LocalDate sunday){
         LocalTime latestTzeis = getLatestTzaisForWeek(sunday);
         List<DayContext> contexts = new ArrayList<>(7);
-        LocalDate currentDay = sunday;
         for(int i = 0; i < 7; i++) {
-            currentDay = currentDay.plusDays(1);
+            LocalDate currentDay = sunday.plusDays(i);
             ComplexZmanimCalendar zmanimCalendar = createCalendar(currentDay);
             LocalDate nextDay = currentDay.plusDays(1);
             JewishCalendar jewishCalendarNextDay = new JewishCalendar(Date.from(nextDay.atStartOfDay(getTimezone()).toInstant()));
@@ -193,13 +202,12 @@ public class DailyHoursCreationService {
         return LocalDateTime.ofInstant(date.toInstant(), getTimezone()).toLocalTime().truncatedTo(ChronoUnit.MINUTES);
     }
 
-    private LocalTime getLatestTzaisForWeek(LocalDate sunday) {
+    private LocalTime getLatestTzaisForWeek(final LocalDate sunday) {
 
-        LocalDate day = sunday;
         LocalTime latestTzais = LocalTime.MIN;
 
         for(int i = 0; i < 7; i++) {
-            day = day.plusDays(1);
+            LocalDate day = sunday.plusDays(i);
             ComplexZmanimCalendar zmanimCalendar = createCalendar(day);
             LocalTime tzais = zmanimCalendar.getTzais().toInstant().atZone(getTimezone()).toLocalTime();
             if(tzais.isAfter(latestTzais)) {
