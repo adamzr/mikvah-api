@@ -15,7 +15,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>2.0.1.RELEASE</version>
+        <version>2.1.6.RELEASE</version>
         <relativePath /> <!-- lookup parent from repository -->
     </parent>
 
@@ -23,7 +23,15 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <java.version>1.8</java.version>
-        <stripe.version>5.27.0</stripe.version>
+        <stripe.version>10.4.0</stripe.version>
+        <auth0-spring-security-api.version>1.2.4</auth0-spring-security-api.version>
+        <auth0.version>1.14.1</auth0.version>
+        <simple-java-mail.version>5.1.7</simple-java-mail.version>
+        <utils-mail-dkim.version>1.1.12</utils-mail-dkim.version>
+        <mustache-compiler.version>0.9.6</mustache-compiler.version>
+        <logback-ext-loggly.version>0.1.5</logback-ext-loggly.version>
+        <guava.version>28.0-jre</guava.version>
+        <junit.jupiter.version>5.5.0</junit.jupiter.version>
     </properties>
 
     <dependencies>
@@ -78,13 +86,13 @@
         <dependency>
             <groupId>com.auth0</groupId>
             <artifactId>auth0-spring-security-api</artifactId>
-            <version>1.0.0</version>
+            <version>${auth0-spring-security-api.version}</version>
         </dependency>
 
         <dependency>
             <groupId>com.auth0</groupId>
             <artifactId>auth0</artifactId>
-            <version>1.5.1</version>
+            <version>${auth0.version}</version>
         </dependency>
 
         <dependency>
@@ -112,31 +120,30 @@
         <dependency>
             <groupId>org.flywaydb</groupId>
             <artifactId>flyway-core</artifactId>
-            <version>5.0.5</version><!--$NO-MVN-MAN-VER$ -->
         </dependency>
 
         <dependency>
             <groupId>org.simplejavamail</groupId>
             <artifactId>simple-java-mail</artifactId>
-            <version>5.0.0</version>
+            <version>${simple-java-mail.version}</version>
         </dependency>
 
         <dependency>
             <groupId>net.markenwerk</groupId>
             <artifactId>utils-mail-dkim</artifactId>
-            <version>1.1.11</version>
+            <version>${utils-mail-dkim.version}</version>
         </dependency>
 
         <dependency>
             <groupId>com.github.spullara.mustache.java</groupId>
             <artifactId>compiler</artifactId>
-            <version>0.9.5</version>
+            <version>${mustache-compiler.version}</version>
         </dependency>
 
         <dependency>
             <groupId>org.logback-extensions</groupId>
             <artifactId>logback-ext-loggly</artifactId>
-            <version>0.1.2</version>
+            <version>${logback-ext-loggly.version}</version>
         </dependency>
 
         <dependency>
@@ -169,6 +176,12 @@
         </dependency>
 
         <dependency>
+            <groupId>com.google.guava</groupId>
+            <artifactId>guava</artifactId>
+            <version>${guava.version}</version>
+        </dependency>
+
+        <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
@@ -177,6 +190,19 @@
         <dependency>
             <groupId>org.springframework.security</groupId>
             <artifactId>spring-security-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>${junit.jupiter.version}</version>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
             <scope>test</scope>
         </dependency>
 

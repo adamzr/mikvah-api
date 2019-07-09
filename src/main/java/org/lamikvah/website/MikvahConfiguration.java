@@ -54,4 +54,5 @@ public class MikvahConfiguration {
         private String webhookEndpointSecret;
 
     }
+
 }

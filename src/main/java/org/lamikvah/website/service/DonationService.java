@@ -1,19 +1,20 @@
 package org.lamikvah.website.service;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.math.BigDecimal;
 
 import org.lamikvah.website.data.MikvahUser;
 import org.lamikvah.website.exception.DonationPaymentException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
-import com.stripe.exception.APIConnectionException;
-import com.stripe.exception.APIException;
+import com.stripe.exception.ApiConnectionException;
+import com.stripe.exception.ApiException;
 import com.stripe.exception.AuthenticationException;
 import com.stripe.exception.CardException;
 import com.stripe.exception.InvalidRequestException;
+import com.stripe.exception.StripeException;
 import com.stripe.model.Charge;
+import com.stripe.param.ChargeCreateParams;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -21,34 +22,50 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class DonationService {
 
-    @Autowired private EmailService emailService;
+    @Autowired
+    private EmailService emailService;
 
-    public void donate(MikvahUser user, String name, String email, double amount, String stripeToken) {
+    public Charge donate(final MikvahUser user, final String name, final String email, final double amount,
+            final String stripeToken) {
 
         // Charge the user's card:
-        Map<String, Object> chargeParams = new HashMap<>();
-        chargeParams.put("amount", String.valueOf((int)(amount * 100)));
-        chargeParams.put("currency", "usd");
+        final ChargeCreateParams.Builder chargeParamsBuilder = ChargeCreateParams.builder()
+                .setAmount(getAmountInCents(amount)).setCurrency("usd")
+                .setStatementDescriptor("Donation");
         if (user != null) {
-            chargeParams.put("customer", user.getStripeCustomerId());
+            chargeParamsBuilder.setCustomer(user.getStripeCustomerId());
         } else {
-            chargeParams.put("source", stripeToken);
+            chargeParamsBuilder.setSource(stripeToken);
         }
+        final Charge charge;
         try {
-            Charge charge = Charge.create(chargeParams);
-            log.info("User with id={} email={} donated amount={} USD with charge ID={}", user != null ? user.getId() : "N/A", email, amount, charge.getId());
-        } catch (AuthenticationException | InvalidRequestException | APIConnectionException | APIException e) {
-            log.error("Payment processing error.", e);
-            throw new DonationPaymentException("There was a problem processing your payment. Please try again later.", e);
-        }  catch (CardException e) {
+            charge = Charge.create(chargeParamsBuilder.build());
+            log.info("User with id={} email={} donated amount={} USD with charge ID={}",
+                    user != null ? user.getId() : "N/A", email, amount, charge.getId());
+        } catch (final CardException e) {
             log.info("Card processing error.", e);
-            throw new DonationPaymentException("There was a problem processing your payment. " + e.getLocalizedMessage());
+            throw new DonationPaymentException(
+                    "There was a problem processing your payment. " + e.getLocalizedMessage());
+        } catch (AuthenticationException | InvalidRequestException | ApiConnectionException | ApiException e) {
+            log.error("Payment processing error.", e);
+            throw new DonationPaymentException("There was a problem processing your payment. Please try again later.",
+                    e);
+        } catch (final StripeException e) {
+            log.error("Payment processing error.", e);
+            throw new DonationPaymentException("There was a problem processing your payment. Please try again later.",
+                    e);
         }
 
-        String to = user != null ? user.getFullName() : name;
-        String emailAddress = user != null ? user.getEmail() : email;
+        final String to = user != null ? user.getFullName() : name;
+        final String emailAddress = user != null ? user.getEmail() : email;
         emailService.sendDonationEmail(to, emailAddress, amount);
+        return charge;
 
+    }
+
+    private long getAmountInCents(final double amount) {
+
+        return new BigDecimal(amount).multiply(new BigDecimal(100)).longValue();
     }
 
 }

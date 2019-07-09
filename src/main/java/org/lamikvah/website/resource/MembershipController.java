@@ -16,11 +16,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.stripe.exception.APIConnectionException;
-import com.stripe.exception.APIException;
-import com.stripe.exception.AuthenticationException;
-import com.stripe.exception.CardException;
-import com.stripe.exception.InvalidRequestException;
+import com.stripe.exception.StripeException;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -68,8 +64,7 @@ public class MembershipController {
         if(autoRenewRequest.isEnabled()) {
             try {
                 service.enableAutoRenew(user);
-            } catch (AuthenticationException | InvalidRequestException | APIConnectionException | CardException
-                    | APIException e) {
+            } catch (StripeException e) {
                 log.error("Error enabling auto-renew for user={}.", user, e);
                 return MessageResponse.builder().message("Sorry, there was a problem enabling auto-renew. Please try again later.").success(false).build();
             }
@@ -78,8 +73,7 @@ public class MembershipController {
         } else {
             try {
                 service.disableAutoRenew(user);
-            } catch (AuthenticationException | InvalidRequestException | APIConnectionException | CardException
-                    | APIException e) {
+            } catch (StripeException e) {
                 log.error("Error disabling auto-renew for user={}.", user, e);
                 return MessageResponse.builder().message("Sorry, there was a problem disabling auto-renew. Please try again later.").success(false).build();
             }

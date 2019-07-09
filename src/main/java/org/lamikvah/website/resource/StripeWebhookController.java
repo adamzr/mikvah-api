@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.stripe.exception.SignatureVerificationException;
 import com.stripe.model.Event;
 import com.stripe.model.Invoice;
+import com.stripe.model.StripeObject;
 import com.stripe.model.Subscription;
 import com.stripe.net.Webhook;
 
@@ -26,42 +27,56 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class StripeWebhookController {
 
-    @Autowired private MikvahConfiguration config;
-    @Autowired private ProcessedStripeEventRespository repo;
-    @Autowired private MembershipService membershipService;
-    @Autowired private EmailService emailService;
+    @Autowired
+    private MikvahConfiguration config;
+
+    @Autowired
+    private ProcessedStripeEventRespository repo;
+
+    @Autowired
+    private MembershipService membershipService;
+
+    @Autowired
+    private EmailService emailService;
 
     @PostMapping("/webhook")
-    public ResponseEntity<String> handleStripeEvent(@RequestBody String payload, @RequestHeader("Stripe-Signature") String sigHeader) {
+    public ResponseEntity<String> handleStripeEvent(@RequestBody final String payload,
+            @RequestHeader("Stripe-Signature") final String sigHeader) {
 
         log.info("Processing event {}", payload);
         Event event;
         try {
             event = Webhook.constructEvent(payload, sigHeader, config.getStripe().getWebhookEndpointSecret());
-        } catch (SignatureVerificationException e) {
+        } catch (final SignatureVerificationException e) {
             log.error("Signature validation failed!!!!", e);
             return ResponseEntity.noContent().build();
         }
-        String eventId = event.getId();
-        Optional<ProcessedStripeEvent> processedEvent = repo.findById(eventId);
-        if(processedEvent.isPresent()) {
+        final String eventId = event.getId();
+        final Optional<ProcessedStripeEvent> processedEvent = repo.findById(eventId);
+        if (processedEvent.isPresent()) {
             log.warn("Already processed this event!");
             return ResponseEntity.noContent().build();
         }
 
-        String eventType = event.getType();
-        switch(eventType) {
+        final String eventType = event.getType();
+        final Optional<StripeObject> optionalObject = event.getDataObjectDeserializer().getObject();
+        if (optionalObject.isEmpty()) {
+            log.warn("Received event that could not be deserielized!!! event={}", event);
+            return ResponseEntity.noContent().build();
+        }
+        final StripeObject object = optionalObject.get();
+        switch (eventType) {
             case "invoice.upcoming":
-                Invoice upcomingInvoice = (Invoice) event.getData().getObject();
+                final Invoice upcomingInvoice = (Invoice) object;
                 log.info("Sending email about upcoming membership renewal: {}", upcomingInvoice);
                 emailService.sendUpcomingRenewalEmail(upcomingInvoice);
-            break;
+                break;
             case "invoice.payment_succeeded":
-                Invoice invoice = (Invoice) event.getData().getObject();
+                final Invoice invoice = (Invoice) object;
                 membershipService.updateMembersip(invoice);
                 break;
             case "customer.subscription.deleted":
-                Subscription subscription = (Subscription) event.getData().getObject();
+                final Subscription subscription = (Subscription) object;
                 membershipService.cancelMembership(subscription);
                 break;
             default:

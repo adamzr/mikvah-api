@@ -7,9 +7,7 @@ import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -33,13 +31,16 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 
-import com.stripe.exception.APIConnectionException;
-import com.stripe.exception.APIException;
+import com.stripe.exception.ApiConnectionException;
+import com.stripe.exception.ApiException;
 import com.stripe.exception.AuthenticationException;
 import com.stripe.exception.CardException;
 import com.stripe.exception.InvalidRequestException;
+import com.stripe.exception.StripeException;
 import com.stripe.model.Charge;
 import com.stripe.model.Refund;
+import com.stripe.param.ChargeCreateParams;
+import com.stripe.param.RefundCreateParams;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -54,7 +55,7 @@ public class AppointmentService {
 
     @Autowired
     private AppointmentSlotRepository appointmentSlotRepository;
-    
+
     @Autowired
     private DailyHoursService dailyHoursService;
 
@@ -65,70 +66,70 @@ public class AppointmentService {
     private EmailService emailService;
 
     public List<LocalDateTime> getAvailableTimes() {
-        
-        LocalDateTime now = LocalDateTime.now(Clock.system(ZoneId.of(config.getTimeZone())));
-        Optional<DailyHours> hoursToday = dailyHoursService.getHoursForDay(now.toLocalDate());
+
+        final LocalDateTime now = LocalDateTime.now(Clock.system(ZoneId.of(config.getTimeZone())));
+        final Optional<DailyHours> hoursToday = dailyHoursService.getHoursForDay(now.toLocalDate());
         LocalDateTime start = now;
-        if(hoursToday.isPresent()) {
-            DailyHours hours = hoursToday.get();
-            if(hours.getOpeningLocalTime().isPresent() && hours.getClosingLocalTime().isPresent()) {
-                if(hours.getOpeningLocalTime().get().isBefore(now.toLocalTime())) {
+        if (hoursToday.isPresent()) {
+            final DailyHours hours = hoursToday.get();
+            if (hours.getOpeningLocalTime().isPresent() && hours.getClosingLocalTime().isPresent()) {
+                if (hours.getOpeningLocalTime().get().isBefore(now.toLocalTime())) {
                     start = LocalDateTime.of(now.toLocalDate(), hours.getClosingLocalTime().get().plusMinutes(1));
                 }
             }
         }
 
-        LocalDateTime end = start.plusDays(8);
-        List<AppointmentSlot> slots = appointmentSlotRepository.findByStartBetweenAndMikvahUserOrderByStartAsc(start,
-                end, null);
+        final LocalDateTime end = start.plusDays(8);
+        final List<AppointmentSlot> slots = appointmentSlotRepository
+                .findByStartBetweenAndMikvahUserOrderByStartAsc(start, end, null);
         return slots.stream().map(AppointmentSlot::getStart).distinct().sorted().collect(Collectors.toList());
 
     }
 
     @Transactional(isolation = Isolation.SERIALIZABLE, timeout = 10)
-    public AppointmentSlotDto createAppointment(AppointmentRequest appointmentRequest, MikvahUser user) {
+    public AppointmentSlotDto createAppointment(final AppointmentRequest appointmentRequest, final MikvahUser user) {
 
-        LocalDateTime requestedTime = appointmentRequest.getTime();
-        LocalDate requestedDate = requestedTime.toLocalDate();
-        LocalDateTime now = LocalDateTime.now(ZoneId.of(config.getTimeZone()));
-        if(now.toLocalDate().isEqual(requestedDate)) {
+        final LocalDateTime requestedTime = appointmentRequest.getTime();
+        final LocalDate requestedDate = requestedTime.toLocalDate();
+        final LocalDateTime now = LocalDateTime.now(ZoneId.of(config.getTimeZone()));
+        if (now.toLocalDate().isEqual(requestedDate)) {
             // Appointment is for today
-            Optional<DailyHours> dailyHours = dailyHoursService.getHoursForDay(requestedDate);
-            if(dailyHours.isPresent()) {
-                Optional<LocalTime> openingTime = dailyHours.get().getOpeningLocalTime();
-                if(openingTime.isPresent()) {
-                    if(now.toLocalTime().isAfter(openingTime.get())) {
+            final Optional<DailyHours> dailyHours = dailyHoursService.getHoursForDay(requestedDate);
+            if (dailyHours.isPresent()) {
+                final Optional<LocalTime> openingTime = dailyHours.get().getOpeningLocalTime();
+                if (openingTime.isPresent()) {
+                    if (now.toLocalTime().isAfter(openingTime.get())) {
                         log.info("User tried to make an appointment for today, but the mikvah is already open.");
-                        throw new AppointmentCreationException("Appointments can not be made for today once the mikvah is already open.");
+                        throw new AppointmentCreationException(
+                                "Appointments can not be made for today once the mikvah is already open.");
                     }
                 }
             }
         }
-        
-        List<AppointmentSlot> possibleSlots = appointmentSlotRepository
+
+        final List<AppointmentSlot> possibleSlots = appointmentSlotRepository
                 .findByStartAndMikvahUserIsNullOrderByIdAsc(requestedTime);
         if (CollectionUtils.isEmpty(possibleSlots)) {
-            log.warn("User {} tried to make an appointment {} but there were no appoitment slots available!", user, appointmentRequest);
-            throw new AppointmentCreationException("There were no available appointments for the requested time. Please try a different time.");
+            log.warn("User {} tried to make an appointment {} but there were no appoitment slots available!", user,
+                    appointmentRequest);
+            throw new AppointmentCreationException(
+                    "There were no available appointments for the requested time. Please try a different time.");
         }
-        Optional<String> stripeChargeId = handleUserPayment(user);
+        final Optional<String> stripeChargeId = handleUserPayment(user);
 
-        AppointmentSlot slot = possibleSlots.get(0);
+        final AppointmentSlot slot = possibleSlots.get(0);
         slot.setMikvahUser(user);
         slot.setNotes(appointmentRequest.getNotes());
-        if(stripeChargeId.isPresent()) {
+        if (stripeChargeId.isPresent()) {
             slot.setStripeChargeId(stripeChargeId.get());
         }
-        AppointmentSlot savedSlot = appointmentSlotRepository.save(slot);
+        final AppointmentSlot savedSlot = appointmentSlotRepository.save(slot);
 
-        ReservationHistoryLog reservationHistoryLog = ReservationHistoryLog.builder()
-                .action(AppointmentAction.MADE)
-                .appointmentSlot(slot)
-                .created(LocalDateTime.now(Clock.systemUTC()))
-                .mikvahUser(user)
-                .build();
+        final ReservationHistoryLog reservationHistoryLog = ReservationHistoryLog.builder()
+                .action(AppointmentAction.MADE).appointmentSlot(slot).created(LocalDateTime.now(Clock.systemUTC()))
+                .mikvahUser(user).build();
 
-        if(stripeChargeId.isPresent()) {
+        if (stripeChargeId.isPresent()) {
             reservationHistoryLog.setStripeId(stripeChargeId.get());
         }
         reservationHistoryLogRepository.save(reservationHistoryLog);
@@ -137,44 +138,39 @@ public class AppointmentService {
 
         log.info("User {} made appointment {}", user, savedSlot);
 
-        return AppointmentSlotDto.builder()
-                .id(savedSlot.getId())
-                .start(savedSlot.getStart())
-                .notes(savedSlot.getNotes())
-                .build();
+        return AppointmentSlotDto.builder().id(savedSlot.getId()).start(savedSlot.getStart())
+                .notes(savedSlot.getNotes()).build();
     }
 
     @Transactional(isolation = Isolation.SERIALIZABLE, timeout = 10)
-    public Optional<String> cancelAppointment(MikvahUser user, long slotId) {
+    public Optional<String> cancelAppointment(final MikvahUser user, final long slotId) {
 
-        Optional<AppointmentSlot> existingSlot = appointmentSlotRepository.findById(slotId);
-        if(!existingSlot.isPresent()) {
+        final Optional<AppointmentSlot> existingSlot = appointmentSlotRepository.findById(slotId);
+        if (!existingSlot.isPresent())
             return Optional.empty();
-        }
-        AppointmentSlot slot = existingSlot.get();
-        if(slot.getMikvahUser() == null) {
+        final AppointmentSlot slot = existingSlot.get();
+        if (slot.getMikvahUser() == null)
             return Optional.empty();
-        }
-        if(!slot.getMikvahUser().equals(user)) {
+        if (!slot.getMikvahUser().equals(user))
             throw new ServerErrorException("You can only cancel your own appointment.");
-        }
-        LocalDateTime now = LocalDateTime.now(ZoneId.of(config.getTimeZone()));
-        LocalDate slotDate = slot.getStart().toLocalDate();
-        if(now.toLocalDate().isEqual(slotDate)) {
+        final LocalDateTime now = LocalDateTime.now(ZoneId.of(config.getTimeZone()));
+        final LocalDate slotDate = slot.getStart().toLocalDate();
+        if (now.toLocalDate().isEqual(slotDate)) {
             // Appointment is for today
-            Optional<DailyHours> dailyHours = dailyHoursService.getHoursForDay(slotDate);
-            if(dailyHours.isPresent()) {
-                Optional<LocalTime> openingTime = dailyHours.get().getOpeningLocalTime();
-                if(openingTime.isPresent()) {
-                    if(now.toLocalTime().isAfter(openingTime.get())) {
+            final Optional<DailyHours> dailyHours = dailyHoursService.getHoursForDay(slotDate);
+            if (dailyHours.isPresent()) {
+                final Optional<LocalTime> openingTime = dailyHours.get().getOpeningLocalTime();
+                if (openingTime.isPresent()) {
+                    if (now.toLocalTime().isAfter(openingTime.get())) {
                         log.info("User tried to cancel an appointment for today, but the mikvah is already open.");
-                        throw new ServerErrorException("Appointments can not be cancelled on the day they are for once the mikvah is open.");
+                        throw new ServerErrorException(
+                                "Appointments can not be cancelled on the day they are for once the mikvah is open.");
                     }
                 }
             }
         }
         Optional<String> refundId = Optional.empty();
-        if(!StringUtils.isEmpty(slot.getStripeChargeId())) {
+        if (!StringUtils.isEmpty(slot.getStripeChargeId())) {
             refundId = refundCharge(slot.getStripeChargeId());
             log.info("User {} was refunded for cancelled. Refund ID: ", user, refundId);
         }
@@ -183,14 +179,11 @@ public class AppointmentService {
         slot.setNotes(null);
         appointmentSlotRepository.save(slot);
 
-        ReservationHistoryLog reservationHistoryLog = ReservationHistoryLog.builder()
-                .action(AppointmentAction.CANCELED)
-                .appointmentSlot(slot)
-                .created(LocalDateTime.now(Clock.systemUTC()))
-                .mikvahUser(user)
-                .build();
+        final ReservationHistoryLog reservationHistoryLog = ReservationHistoryLog.builder()
+                .action(AppointmentAction.CANCELED).appointmentSlot(slot).created(LocalDateTime.now(Clock.systemUTC()))
+                .mikvahUser(user).build();
 
-        if(refundId.isPresent()) {
+        if (refundId.isPresent()) {
             reservationHistoryLog.setStripeId(refundId.get());
         }
         reservationHistoryLogRepository.save(reservationHistoryLog);
@@ -202,56 +195,58 @@ public class AppointmentService {
         return refundId;
     }
 
-    private Optional<String> refundCharge(String stripeChargeId) {
+    private Optional<String> refundCharge(final String stripeChargeId) {
 
-        Map<String, Object> params = new HashMap<>();
-        params.put("charge", stripeChargeId);
+        final RefundCreateParams params = RefundCreateParams.builder().setCharge(stripeChargeId).build();
         Refund refund;
         try {
             refund = Refund.create(params);
-        } catch (AuthenticationException | InvalidRequestException | APIConnectionException | CardException
-                | APIException e) {
+        } catch (final StripeException e) {
             log.error("We failed to refund charge={}!!!!", stripeChargeId, e);
             return Optional.empty();
         }
         return Optional.of(refund.getId());
     }
 
-    private Optional<String> handleUserPayment(MikvahUser user) {
+    private Optional<String> handleUserPayment(final MikvahUser user) {
 
-        if(user.isMember()) {
+        if (user.isMember())
             return Optional.empty();
-        }
 
         // Charge the user's card:
-        Map<String, Object> chargeParams = new HashMap<>();
-        chargeParams.put("amount", config.getAppointmentCost());
-        chargeParams.put("currency", config.getCurrency());
-        chargeParams.put("customer", user.getStripeCustomerId());
+        final ChargeCreateParams params = ChargeCreateParams.builder()
+                .setAmount((long) config.getAppointmentCost())
+                .setCurrency(config.getCurrency())
+                .setCustomer(user.getStripeCustomerId())
+                .setStatementDescriptor("Appointment").build();
         try {
-            Charge charge = Charge.create(chargeParams);
+            final Charge charge = Charge.create(params);
             return Optional.of(charge.getId());
-        } catch (AuthenticationException | InvalidRequestException | APIConnectionException | APIException e) {
+        } catch (AuthenticationException | InvalidRequestException | ApiConnectionException | ApiException e) {
             log.error("Payment processing error.", e);
-            throw new AppointmentCreationException("There was a problem processing your payment. Please try again later.");
-        }  catch (CardException e) {
+            throw new AppointmentCreationException(
+                    "There was a problem processing your payment. Please try again later.");
+        } catch (final CardException e) {
             log.info("Card processing error.", e);
-            throw new AppointmentCreationException("There was a problem processing your payment. " + e.getLocalizedMessage());
+            throw new AppointmentCreationException(
+                    "There was a problem processing your payment. " + e.getLocalizedMessage());
+        } catch (final StripeException e) {
+            log.error("Payment processing error.", e);
+            throw new AppointmentCreationException(
+                    "There was a problem processing your payment. Please try again later.");
         }
 
     }
 
-    public List<AttendentAppointmentView> getAppointmentsForAttendants(LocalDateTime now) {
-        List<AppointmentSlot> todaysSlots = appointmentSlotRepository.findByStartBetweenOrderByStartAsc(now.toLocalDate().atStartOfDay(), now.toLocalDate().atTime(LocalTime.MAX));
-        return todaysSlots.stream()
-                .filter(slot -> slot.getMikvahUser() != null)
-                .map(slot ->
-                        AttendentAppointmentView.builder()
-                            .firstName(slot.getMikvahUser().getFirstName())
-                            .time(slot.getStart().toLocalTime().format(TIME_FORMAT))
-                            .notes(slot.getNotes())
-                            .build()
-                        )
+    public List<AttendentAppointmentView> getAppointmentsForAttendants(final LocalDateTime now) {
+
+        final List<AppointmentSlot> todaysSlots = appointmentSlotRepository.findByStartBetweenOrderByStartAsc(
+                now.toLocalDate().atStartOfDay(), now.toLocalDate().atTime(LocalTime.MAX));
+        return todaysSlots.stream().filter(slot -> slot.getMikvahUser() != null)
+                .map(slot -> AttendentAppointmentView.builder()
+                        .firstName(slot.getMikvahUser().getFirstName())
+                        .time(slot.getStart().toLocalTime().format(TIME_FORMAT))
+                        .notes(slot.getNotes()).build())
                 .sorted(Comparator.comparing(AttendentAppointmentView::getTime))
                 .collect(Collectors.toList());
 
