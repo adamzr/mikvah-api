@@ -10,19 +10,22 @@ import lombok.Data;
 @Data
 @Builder
 public class AppointmentSlotDto {
-    
+
     private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ISO_OFFSET_DATE_TIME;
 
     long id;
-    
+
     LocalDateTime start;
-    
+
     String notes;
-    
+
     String lastCancellation;
-    
-    public void setLastCancellation(ZonedDateTime zdt) {
+
+    RoomType roomType;
+
+    public void setLastCancellation(final ZonedDateTime zdt) {
+
         lastCancellation = FORMATTER.format(zdt);
     }
-    
+
 }

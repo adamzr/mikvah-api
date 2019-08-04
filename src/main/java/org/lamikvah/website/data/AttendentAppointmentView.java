@@ -9,6 +9,8 @@ public class AttendentAppointmentView {
 
     String time;
 
+    String roomType;
+
     String firstName;
 
     String notes;

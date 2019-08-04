@@ -1,6 +1,5 @@
 package org.lamikvah.website.resource;
 
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -9,6 +8,7 @@ import javax.servlet.http.HttpServletRequest;
 import org.lamikvah.website.data.AppointmentCreationResponse;
 import org.lamikvah.website.data.AppointmentRequest;
 import org.lamikvah.website.data.AppointmentSlotDto;
+import org.lamikvah.website.data.AvailableDateTimeAndRoomType;
 import org.lamikvah.website.data.MikvahUser;
 import org.lamikvah.website.exception.AppointmentCreationException;
 import org.lamikvah.website.service.AppointmentService;
@@ -29,7 +29,6 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class AppointmentController {
 
-
     @Autowired
     private AppointmentService appointmentService;
 
@@ -37,22 +36,24 @@ public class AppointmentController {
     private MikvahUserService mikvahUserService;
 
     @GetMapping("/appointments/availability")
-    public List<LocalDateTime> getAvailableAppointments() {
+    public List<AvailableDateTimeAndRoomType> getAvailableAppointments() {
+
         return appointmentService.getAvailableTimes();
     }
 
     @PostMapping("/appointments")
-    public AppointmentCreationResponse createAppointment(@RequestBody AppointmentRequest appointmentRequest, HttpServletRequest request) {
+    public AppointmentCreationResponse createAppointment(@RequestBody final AppointmentRequest appointmentRequest,
+            final HttpServletRequest request) {
 
-        MikvahUser user = mikvahUserService.getUser(request);
+        final MikvahUser user = mikvahUserService.getUser(request);
         try {
-            AppointmentSlotDto slot = appointmentService.createAppointment(appointmentRequest,
+            final AppointmentSlotDto slot = appointmentService.createAppointment(appointmentRequest,
                     user);
             return AppointmentCreationResponse.builder()
                     .slot(slot)
                     .message("Your appointment was created successfully!")
                     .build();
-        } catch (AppointmentCreationException e) {
+        } catch (final AppointmentCreationException e) {
             return AppointmentCreationResponse.builder()
                     .message(e.getMessage())
                     .build();
@@ -60,15 +61,15 @@ public class AppointmentController {
     }
 
     @DeleteMapping("/appointments/{id}")
-    public String cancelAppointment(@PathVariable("id") Long id, HttpServletRequest request) {
-        MikvahUser user = mikvahUserService.getUser(request);
-        Optional<String> refundId = appointmentService.cancelAppointment(user, id);
+    public String cancelAppointment(@PathVariable("id") final Long id, final HttpServletRequest request) {
+
+        final MikvahUser user = mikvahUserService.getUser(request);
+        final Optional<String> refundId = appointmentService.cancelAppointment(user, id);
         log.info("Cancelled appointment {}.", id);
-        if(refundId.isPresent()) {
+        if (refundId.isPresent())
             return "\"Your appointment was cancelled and your fee was refunded. Thank you.\"";
-        } else {
+        else
             return "\"Your appointment was cancelled. Thank you.\"";
-        }
 
     }
 

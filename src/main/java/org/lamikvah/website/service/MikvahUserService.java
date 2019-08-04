@@ -41,36 +41,51 @@ import com.auth0.net.Request;
 @Component
 public class MikvahUserService {
 
-    @Autowired private MikvahConfiguration config;
-    @Autowired private MikvahUserRepository userRepository;
-    @Autowired private CreditCardService creditCardService;
-    @Autowired private AppointmentSlotRepository appointmentSlotRepository;
-    @Autowired private MembershipRepository membershipRepository;
-    @Autowired @Lazy private Optional<EmailService> emailService;
-    @Autowired private DailyHoursService dailyHoursService;
+    @Autowired
+    private MikvahConfiguration config;
+
+    @Autowired
+    private MikvahUserRepository userRepository;
+
+    @Autowired
+    private CreditCardService creditCardService;
+
+    @Autowired
+    private AppointmentSlotRepository appointmentSlotRepository;
+
+    @Autowired
+    private MembershipRepository membershipRepository;
+
+    @Autowired
+    @Lazy
+    private Optional<EmailService> emailService;
+
+    @Autowired
+    private DailyHoursService dailyHoursService;
 
     private final ManagementAPI auth0ManagementApi;
 
     private static final UserFilter NO_OP_USER_FILTER = new UserFilter();
 
     @Autowired
-    public MikvahUserService(@Autowired MikvahConfiguration config) {
+    public MikvahUserService(@Autowired final MikvahConfiguration config) {
+
         auth0ManagementApi = new ManagementAPI(config.getAuth0().getIssuer(), config.getAuth0().getManagementToken());
     }
 
-    private String getUserEmail(String principalName) throws Auth0Exception {
+    private String getUserEmail(final String principalName) throws Auth0Exception {
 
-        Request<User> apiRequest = auth0ManagementApi.users().get(principalName, NO_OP_USER_FILTER);
-        User user = apiRequest.execute();
+        final Request<User> apiRequest = auth0ManagementApi.users().get(principalName, NO_OP_USER_FILTER);
+        final User user = apiRequest.execute();
         return user.getEmail();
 
     }
 
-    public MikvahUser saveUser(String auth0UserId, UserRequestDto request) throws Auth0Exception {
+    public MikvahUser saveUser(final String auth0UserId, final UserRequestDto request) throws Auth0Exception {
 
-        MikvahUser user = userRepository.getByAuth0UserId(auth0UserId).orElse(new MikvahUser());
-        if(user.getEmail() == null) {
-            String email = getUserEmail(auth0UserId);
+        final MikvahUser user = userRepository.getByAuth0UserId(auth0UserId).orElse(new MikvahUser());
+        if (user.getEmail() == null) {
+            final String email = getUserEmail(auth0UserId);
             user.setEmail(email);
         }
         user.setTitle(request.getTitle());
@@ -91,38 +106,39 @@ public class MikvahUserService {
 
     }
 
-    public MikvahUser getUser(HttpServletRequest request){
+    public MikvahUser getUser(final HttpServletRequest request) {
 
-        Principal principal = request.getUserPrincipal();
-        String auth0UserId =  principal.getName();
+        final Principal principal = request.getUserPrincipal();
+        final String auth0UserId = principal.getName();
         try {
             return getUser(auth0UserId);
-        } catch (Auth0Exception e) {
+        } catch (final Auth0Exception e) {
             throw new ServerErrorException("There was a problem getting your user information. Please try again later.",
                     e);
         }
 
     }
 
-    public UserDto getUserWithCreditCardInfo(String auth0UserId) throws Auth0Exception {
-        MikvahUser user = getUser(auth0UserId);
+    public UserDto getUserWithCreditCardInfo(final String auth0UserId) throws Auth0Exception {
+
+        final MikvahUser user = getUser(auth0UserId);
         return convertToUserDto(user);
     }
 
-    public MikvahUser getUser(String auth0UserId) throws Auth0Exception {
+    public MikvahUser getUser(final String auth0UserId) throws Auth0Exception {
 
         Optional<MikvahUser> user = userRepository.getByAuth0UserId(auth0UserId);
-        if(!user.isPresent()) {
-            String email = getUserEmail(auth0UserId);
+        if (!user.isPresent()) {
+            final String email = getUserEmail(auth0UserId);
             user = userRepository.findByEmail(email);
-            if(!user.isPresent()) {
-                MikvahUser newUser = new MikvahUser();
+            if (!user.isPresent()) {
+                final MikvahUser newUser = new MikvahUser();
                 newUser.setAuth0UserId(auth0UserId);
                 newUser.setEmail(email);
                 emailService.get().sendWelcomeEmail(newUser);
                 return userRepository.save(newUser);
             } else {
-                MikvahUser partialUser = user.get();
+                final MikvahUser partialUser = user.get();
                 partialUser.setAuth0UserId(auth0UserId);
                 return userRepository.save(partialUser);
             }
@@ -132,32 +148,35 @@ public class MikvahUserService {
 
     }
 
-    public void saveUser(MikvahUser user) {
+    public void saveUser(final MikvahUser user) {
 
         userRepository.save(user);
 
     }
 
-    private UserDto convertToUserDto(MikvahUser user) {
+    private UserDto convertToUserDto(final MikvahUser user) {
 
-        Optional<CreditCard> card = creditCardService.getCreditCard(user);
-        CreditCard defaultCard = card.orElse(null);
+        final Optional<CreditCard> card = creditCardService.getCreditCard(user);
+        final CreditCard defaultCard = card.orElse(null);
 
         AppointmentSlotDto currentAppointment = null;
-        LocalDateTime now = LocalDateTime.now(Clock.system(ZoneId.of(config.getTimeZone())));
-        LocalDateTime thirtyDaysFromNow = now.plusDays(30);
-        List<AppointmentSlot> appointments = appointmentSlotRepository.findByStartBetweenAndMikvahUserOrderByStartAsc(now, thirtyDaysFromNow, user);
-        if(!CollectionUtils.isEmpty(appointments)) {
-            AppointmentSlot appointment = appointments.get(appointments.size() - 1);
-            
-            LocalDate appointmentDay = appointment.getStart().toLocalDate();
-            Optional<DailyHours> hours = dailyHoursService.getHoursForDay(appointmentDay);
-            LocalTime openingTime = hours.get().getOpeningLocalTime().get();
-            ZonedDateTime lastCancellation = LocalDateTime.of(appointmentDay, openingTime).atZone(ZoneId.of(config.getTimeZone()));
-            
+        final LocalDateTime now = LocalDateTime.now(Clock.system(ZoneId.of(config.getTimeZone())));
+        final LocalDateTime thirtyDaysFromNow = now.plusDays(30);
+        final List<AppointmentSlot> appointments = appointmentSlotRepository
+                .findByStartBetweenAndMikvahUserOrderByStartAsc(now, thirtyDaysFromNow, user);
+        if (!CollectionUtils.isEmpty(appointments)) {
+            final AppointmentSlot appointment = appointments.get(appointments.size() - 1);
+
+            final LocalDate appointmentDay = appointment.getStart().toLocalDate();
+            final Optional<DailyHours> hours = dailyHoursService.getHoursForDay(appointmentDay);
+            final LocalTime openingTime = hours.get().getOpeningLocalTime().get();
+            final ZonedDateTime lastCancellation = LocalDateTime.of(appointmentDay, openingTime)
+                    .atZone(ZoneId.of(config.getTimeZone()));
+
             currentAppointment = AppointmentSlotDto.builder()
                     .id(appointment.getId())
                     .start(appointment.getStart())
+                    .roomType(appointment.getRoomType())
                     .build();
             currentAppointment.setLastCancellation(lastCancellation);
         }
@@ -165,8 +184,8 @@ public class MikvahUserService {
         Plan plan = null;
         LocalDateTime expirationDate = null;
         boolean membershipAutoRenewalEnabled = true;
-        Optional<Membership> membership = membershipRepository.findByMikvahUser(user);
-        if(membership.isPresent()) {
+        final Optional<Membership> membership = membershipRepository.findByMikvahUser(user);
+        if (membership.isPresent()) {
             plan = membership.get().getPlan();
             expirationDate = membership.get().getExpiration();
             membershipAutoRenewalEnabled = membership.get().isAutoRenewEnabled();
@@ -196,14 +215,13 @@ public class MikvahUserService {
                 .build();
     }
 
-    public MikvahUser createUser(UserCreationRequestDto request) {
+    public MikvahUser createUser(final UserCreationRequestDto request) {
 
-        String email = request.getEmail();
-        Optional<MikvahUser> existingUser = userRepository.findByEmail(email);
-        if(existingUser.isPresent()) {
+        final String email = request.getEmail();
+        final Optional<MikvahUser> existingUser = userRepository.findByEmail(email);
+        if (existingUser.isPresent())
             throw new IllegalArgumentException("A user with that email already exists.");
-        }
-        MikvahUser user = new MikvahUser();
+        final MikvahUser user = new MikvahUser();
         user.setEmail(email);
         user.setTitle(request.getTitle());
         user.setFirstName(request.getFirstName());

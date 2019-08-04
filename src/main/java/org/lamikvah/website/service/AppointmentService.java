@@ -19,6 +19,7 @@ import org.lamikvah.website.data.AppointmentRequest;
 import org.lamikvah.website.data.AppointmentSlot;
 import org.lamikvah.website.data.AppointmentSlotDto;
 import org.lamikvah.website.data.AttendentAppointmentView;
+import org.lamikvah.website.data.AvailableDateTimeAndRoomType;
 import org.lamikvah.website.data.DailyHours;
 import org.lamikvah.website.data.MikvahUser;
 import org.lamikvah.website.data.ReservationHistoryLog;
@@ -65,7 +66,7 @@ public class AppointmentService {
     @Autowired
     private EmailService emailService;
 
-    public List<LocalDateTime> getAvailableTimes() {
+    public List<AvailableDateTimeAndRoomType> getAvailableTimes() {
 
         final LocalDateTime now = LocalDateTime.now(Clock.system(ZoneId.of(config.getTimeZone())));
         final Optional<DailyHours> hoursToday = dailyHoursService.getHoursForDay(now.toLocalDate());
@@ -82,8 +83,17 @@ public class AppointmentService {
         final LocalDateTime end = start.plusDays(8);
         final List<AppointmentSlot> slots = appointmentSlotRepository
                 .findByStartBetweenAndMikvahUserOrderByStartAsc(start, end, null);
-        return slots.stream().map(AppointmentSlot::getStart).distinct().sorted().collect(Collectors.toList());
+        return slots.stream().map(this::slotToAvailableDateTimeAndRoomType).distinct().sorted()
+                .collect(Collectors.toList());
 
+    }
+
+    private AvailableDateTimeAndRoomType slotToAvailableDateTimeAndRoomType(final AppointmentSlot slot) {
+
+        return AvailableDateTimeAndRoomType.builder()
+                .dateTime(slot.getStart())
+                .roomType(slot.getRoomType())
+                .build();
     }
 
     @Transactional(isolation = Isolation.SERIALIZABLE, timeout = 10)
@@ -108,7 +118,7 @@ public class AppointmentService {
         }
 
         final List<AppointmentSlot> possibleSlots = appointmentSlotRepository
-                .findByStartAndMikvahUserIsNullOrderByIdAsc(requestedTime);
+                .findByStartAndRoomTypeAndMikvahUserIsNullOrderByIdAsc(requestedTime, appointmentRequest.getRoomType());
         if (CollectionUtils.isEmpty(possibleSlots)) {
             log.warn("User {} tried to make an appointment {} but there were no appoitment slots available!", user,
                     appointmentRequest);
@@ -138,8 +148,12 @@ public class AppointmentService {
 
         log.info("User {} made appointment {}", user, savedSlot);
 
-        return AppointmentSlotDto.builder().id(savedSlot.getId()).start(savedSlot.getStart())
-                .notes(savedSlot.getNotes()).build();
+        return AppointmentSlotDto.builder()
+                .id(savedSlot.getId())
+                .start(savedSlot.getStart())
+                .notes(savedSlot.getNotes())
+                .roomType(savedSlot.getRoomType())
+                .build();
     }
 
     @Transactional(isolation = Isolation.SERIALIZABLE, timeout = 10)
@@ -246,6 +260,7 @@ public class AppointmentService {
                 .map(slot -> AttendentAppointmentView.builder()
                         .firstName(slot.getMikvahUser().getFirstName())
                         .time(slot.getStart().toLocalTime().format(TIME_FORMAT))
+                        .roomType(slot.getRoomType().name().toLowerCase())
                         .notes(slot.getNotes()).build())
                 .sorted(Comparator.comparing(AttendentAppointmentView::getTime))
                 .collect(Collectors.toList());
