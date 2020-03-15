@@ -60,7 +60,7 @@ public class StripeWebhookController {
 
         final String eventType = event.getType();
         final Optional<StripeObject> optionalObject = event.getDataObjectDeserializer().getObject();
-        if (optionalObject.isEmpty()) {
+        if (!optionalObject.isPresent()) {
             log.warn("Received event that could not be deserielized!!! event={}", event);
             return ResponseEntity.noContent().build();
         }

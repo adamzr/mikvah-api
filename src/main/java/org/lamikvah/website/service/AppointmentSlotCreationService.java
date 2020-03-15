@@ -39,8 +39,8 @@ public class AppointmentSlotCreationService {
     private static final long ONE_MINUTE_IN_MILLSECONDS = 60000;
 
     private static final Map<RoomType, List<Integer>> APPOINTMENT_ROOM_TYPE_TO_LIST_OF_START_TIME_OFFSETS = ImmutableMap
-            .of(RoomType.SHOWER, ImmutableList.of(0, 5, 10, 15),
-                    RoomType.BATH, ImmutableList.of(0, 15, 20, 25));
+            .of(RoomType.SHOWER, ImmutableList.of(0, 5, 10, 15, 20), // 5 showers
+                    RoomType.BATH, ImmutableList.of(0, 5, 10, 15, 20, 25, 30)); // 7 baths
 
     @Autowired
     private AppointmentSlotRepository repo;
