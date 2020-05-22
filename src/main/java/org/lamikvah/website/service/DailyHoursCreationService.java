@@ -3,6 +3,7 @@ package org.lamikvah.website.service;
 import java.sql.Date;
 import java.sql.Time;
 import java.time.DayOfWeek;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -49,11 +50,16 @@ public class DailyHoursCreationService {
      * Mikvah should generally not be open past 11:00 PM
      */
     private static final LocalTime LATEST_CLOSING_TIME = LocalTime.of(23, 0);
-    
+
     /**
-     * Mikvah should generally not be open until at least 9:30 PM
+     * Mikvah should generally not be close before 9:30 PM
      */
     private static final LocalTime EARLIEST_CLOSING_TIME = LocalTime.of(21, 30);
+
+    /**
+     * Mikvah should always be open for at least 2 hours
+     */
+    private static final Duration MINIMUM_OPEN_DURARTION = Duration.ofHours(2);
 
     @Autowired
     private DailyHoursRepository repo;
@@ -61,134 +67,156 @@ public class DailyHoursCreationService {
     @Autowired
     private MikvahConfiguration config;
 
-    @Scheduled(initialDelay = 0, fixedRate=ONE_HOUR)
+    @Scheduled(initialDelay = 0, fixedRate = ONE_HOUR)
     public void createHoursForNext3Weeks() {
 
         log.debug("Calculating hours for next 3 weeks.");
 
         LocalDate start = LocalDate.now().with(TemporalAdjusters.previous(DayOfWeek.SUNDAY));
         calculateHoursForWeek(start);
-        for(int i = 0; i < 2; i++) {
+        for (int i = 0; i < 2; i++) {
             start = start.with(TemporalAdjusters.next(DayOfWeek.SUNDAY));
             calculateHoursForWeek(start);
         }
 
     }
 
-    public void calculateHoursForWeek(LocalDate sunday) {
+    public void calculateHoursForWeek(final LocalDate sunday) {
 
         log.debug("Calculating hours for the week starting on {}", sunday);
 
-        List<DayContext> contexts = createDayContextsForWeek(sunday);
-        for(DayContext dayContext: contexts) {
-            Optional<DailyHours> existingHours = repo.findById(Date.valueOf(dayContext.getDate()));
-            if(existingHours.isPresent()) {
-                continue;
+        final List<DayContext> contexts = createDayContextsForWeek(sunday);
+        for (final DayContext dayContext : contexts) {
+            final Optional<DailyHours> existingHours = repo.findById(Date.valueOf(dayContext.getDate()));
+            final DailyHours hours = createHoursForDay(dayContext);
+            if (existingHours.isPresent()) {
+                final DailyHours existing = existingHours.get();
+                if (existing.equals(hours)) {
+                    continue;
+                } else {
+                    repo.delete(existing);
+                }
             }
-            DailyHours hours = createHoursForDay(dayContext);
             log.info("Created hours: {}", hours);
             repo.save(hours);
         }
 
     }
 
-    private DailyHours createHoursForDay(DayContext dayContext) {
+    private DailyHours createHoursForDay(final DayContext dayContext) {
 
-        DailyHours hours = new DailyHours();
+        final DailyHours hours = new DailyHours();
         hours.setDay(Date.valueOf(dayContext.getDate()));
 
-        if(dayContext.isLeilYomKippurOrLeilTishaBav()) {
+        if (dayContext.isLeilYomKippurOrLeilTishaBav()) {
             hours.setClosed(true);
             return hours;
         }
 
-        if(dayContext.isLeilShabbosOrLeilYomTov()) {
+        if (dayContext.isLeilShabbosOrLeilYomTov()) {
             hours.setClosed(false);
-            LocalTime opening = roundToNextTimeEndingIn5or0(dayContext.getCandleLighting().plusHours(1));
+            final LocalTime opening = roundToNextTimeEndingIn5or0(dayContext.getCandleLighting().plusHours(1));
             hours.setOpening(Time.valueOf(opening));
             hours.setClosing(Time.valueOf(opening.plusMinutes(30)));
             return hours;
         }
 
-        if(dayContext.isMotzeiYomKippur()) {
+        if (dayContext.isMotzeiYomKippur()) {
             hours.setClosed(false);
-            LocalTime opening = roundToNextTimeEndingIn5or0(dayContext.getTzeis().plusHours(1));
+            final LocalTime opening = roundToNextTimeEndingIn5or0(dayContext.getTzeis().plusHours(1));
             hours.setOpening(Time.valueOf(opening));
             hours.setClosing(calculateClosing(opening));
             return hours;
         }
 
-        if(dayContext.isLeilPurim()) {
+        if (dayContext.isLeilPurim()) {
             hours.setClosed(false);
-            LocalTime opening = roundToNextTimeEndingIn5or0(dayContext.getLatestTzeisForWeekRoundedUpToNearestFiveMinutes().plusHours(1));
-            hours.setOpening(Time.valueOf(opening));
-            hours.setClosing(calculateClosing(opening));
-            return hours;
-        }
-        
-        if(dayContext.isMotzeiTishaBav()) {
-            hours.setClosed(false);
-            LocalTime opening = roundToNextTimeEndingIn5or0(dayContext.getLatestTzeisForWeekRoundedUpToNearestFiveMinutes().plusHours(1));
+            final LocalTime opening = roundToNextTimeEndingIn5or0(
+                    dayContext.getLatestTzeisForWeekRoundedUpToNearestFiveMinutes().plusHours(1));
             hours.setOpening(Time.valueOf(opening));
             hours.setClosing(calculateClosing(opening));
             return hours;
         }
 
-        if(dayContext.isMotzeiShabbosOrMotzeiYomTov()) {
+        if (dayContext.isMotzeiTishaBav()) {
             hours.setClosed(false);
-            LocalTime opening = roundToNextTimeEndingIn5or0(dayContext.getTzeis().plusMinutes(45));
+            final LocalTime opening = roundToNextTimeEndingIn5or0(
+                    dayContext.getLatestTzeisForWeekRoundedUpToNearestFiveMinutes().plusHours(1));
+            hours.setOpening(Time.valueOf(opening));
+            hours.setClosing(calculateClosing(opening));
+            return hours;
+        }
+
+        if (dayContext.isMotzeiShabbosOrMotzeiYomTov()) {
+            hours.setClosed(false);
+            final LocalTime opening = roundToNextTimeEndingIn5or0(dayContext.getTzeis().plusMinutes(45));
             hours.setOpening(Time.valueOf(opening));
             hours.setClosing(calculateClosing(opening));
             return hours;
         }
 
         hours.setClosed(false);
-        LocalTime opening = dayContext.getLatestTzeisForWeekRoundedUpToNearestFiveMinutes();
+        final LocalTime opening = dayContext.getLatestTzeisForWeekRoundedUpToNearestFiveMinutes();
         hours.setOpening(Time.valueOf(opening));
         hours.setClosing(calculateClosing(opening));
         return hours;
 
     }
 
-    private Time calculateClosing(LocalTime opening) {
-        LocalTime threeHoursAfterOpening = opening.plusHours(3);
-        if(threeHoursAfterOpening.isAfter(LATEST_CLOSING_TIME)) {
-            return Time.valueOf(LATEST_CLOSING_TIME);
+    private Time calculateClosing(final LocalTime opening) {
+
+        final LocalTime regularClosingTime = opening.plusHours(3);
+        final LocalTime earlyClosingTime = opening.plusHours(2);
+
+        LocalTime closingTime = regularClosingTime;
+
+        // If regular closing time would be after 11pm
+        if (regularClosingTime.isAfter(LATEST_CLOSING_TIME)) {
+            // then if 11pm would make the mikvah open for less than 2 hours
+            if (Duration.between(opening, LATEST_CLOSING_TIME).compareTo(MINIMUM_OPEN_DURARTION) < 0) {
+                closingTime = earlyClosingTime; // close 2 hours after opening
+            } else {
+                closingTime = LATEST_CLOSING_TIME; // otherwise, close at 11pm
+            }
         }
 
         // If it overflows into the next day
-        if(threeHoursAfterOpening.getHour() < 12) { // is AM
-            return Time.valueOf(LATEST_CLOSING_TIME);
-        }
-        
-        if(threeHoursAfterOpening.isBefore(EARLIEST_CLOSING_TIME)) {
+        if (closingTime.getHour() < 12)
+            return Time.valueOf(LocalTime.of(23, 59));// just before midnight
+
+        // don't close before 9:30 pm
+        if (closingTime.isBefore(EARLIEST_CLOSING_TIME))
             return Time.valueOf(EARLIEST_CLOSING_TIME);
-        }
-        
-        return Time.valueOf(threeHoursAfterOpening);
+
+        return Time.valueOf(closingTime);
     }
 
-    private List<DayContext> createDayContextsForWeek(final LocalDate sunday){
-        LocalTime latestTzeis = getLatestTzaisForWeek(sunday);
-        List<DayContext> contexts = new ArrayList<>(7);
-        for(int i = 0; i < 7; i++) {
-            LocalDate currentDay = sunday.plusDays(i);
-            ComplexZmanimCalendar zmanimCalendar = createCalendar(currentDay);
-            LocalDate nextDay = currentDay.plusDays(1);
-            JewishCalendar jewishCalendarNextDay = new JewishCalendar(Date.from(nextDay.atStartOfDay(getTimezone()).toInstant()));
-            JewishCalendar jewishCalendarCurrentDay = new JewishCalendar(Date.from(currentDay.atStartOfDay(getTimezone()).toInstant()));
+    private List<DayContext> createDayContextsForWeek(final LocalDate sunday) {
 
-            int currentDayYomTovIndex = jewishCalendarCurrentDay.getYomTovIndex();
-            int nextDayYomTovIndex = jewishCalendarNextDay.getYomTovIndex();
+        final LocalTime latestTzeis = getLatestTzaisForWeek(sunday);
+        final List<DayContext> contexts = new ArrayList<>(7);
+        for (int i = 0; i < 7; i++) {
+            final LocalDate currentDay = sunday.plusDays(i);
+            final ComplexZmanimCalendar zmanimCalendar = createCalendar(currentDay);
+            final LocalDate nextDay = currentDay.plusDays(1);
+            final JewishCalendar jewishCalendarNextDay = new JewishCalendar(
+                    java.util.Date.from(nextDay.atStartOfDay(getTimezone()).toInstant()));
+            final JewishCalendar jewishCalendarCurrentDay = new JewishCalendar(
+                    java.util.Date.from(currentDay.atStartOfDay(getTimezone()).toInstant()));
 
-            DayContext context = DayContext.builder()
+            final int currentDayYomTovIndex = jewishCalendarCurrentDay.getYomTovIndex();
+            final int nextDayYomTovIndex = jewishCalendarNextDay.getYomTovIndex();
+
+            final DayContext context = DayContext.builder()
                     .date(currentDay)
                     .latestTzeisForWeekRoundedUpToNearestFiveMinutes(latestTzeis)
                     .candleLighting(convertDateToLocalTime(zmanimCalendar.getCandleLighting()))
                     .isLeilShabbosOrLeilYomTov(isLeilYomTovOrShabbos(currentDay, jewishCalendarNextDay))
                     .isLeilPurim(nextDayYomTovIndex == JewishCalendar.PURIM)
-                    .isLeilYomKippurOrLeilTishaBav(nextDayYomTovIndex == JewishCalendar.TISHA_BEAV || nextDayYomTovIndex == JewishCalendar.YOM_KIPPUR)
-                    .isMotzeiShabbosOrMotzeiYomTov(currentDay.getDayOfWeek() == DayOfWeek.SATURDAY || YOM_TOV_INDEXES.contains(currentDayYomTovIndex))
+                    .isLeilYomKippurOrLeilTishaBav(nextDayYomTovIndex == JewishCalendar.TISHA_BEAV
+                            || nextDayYomTovIndex == JewishCalendar.YOM_KIPPUR)
+                    .isMotzeiShabbosOrMotzeiYomTov(currentDay.getDayOfWeek() == DayOfWeek.SATURDAY
+                            || YOM_TOV_INDEXES.contains(currentDayYomTovIndex))
                     .isMotzeiYomKippur(currentDayYomTovIndex == JewishCalendar.YOM_KIPPUR)
                     .isMotzeiTishaBav(currentDayYomTovIndex == JewishCalendar.TISHA_BEAV)
                     .tzeis(convertDateToLocalTime(zmanimCalendar.getTzais()))
@@ -198,7 +226,8 @@ public class DailyHoursCreationService {
         return contexts;
     }
 
-    private LocalTime convertDateToLocalTime(java.util.Date date) {
+    private LocalTime convertDateToLocalTime(final java.util.Date date) {
+
         return LocalDateTime.ofInstant(date.toInstant(), getTimezone()).toLocalTime().truncatedTo(ChronoUnit.MINUTES);
     }
 
@@ -206,11 +235,11 @@ public class DailyHoursCreationService {
 
         LocalTime latestTzais = LocalTime.MIN;
 
-        for(int i = 0; i < 7; i++) {
-            LocalDate day = sunday.plusDays(i);
-            ComplexZmanimCalendar zmanimCalendar = createCalendar(day);
-            LocalTime tzais = zmanimCalendar.getTzais().toInstant().atZone(getTimezone()).toLocalTime();
-            if(tzais.isAfter(latestTzais)) {
+        for (int i = 0; i < 7; i++) {
+            final LocalDate day = sunday.plusDays(i);
+            final ComplexZmanimCalendar zmanimCalendar = createCalendar(day);
+            final LocalTime tzais = zmanimCalendar.getTzais().toInstant().atZone(getTimezone()).toLocalTime();
+            if (tzais.isAfter(latestTzais)) {
                 latestTzais = tzais;
             }
         }
@@ -221,10 +250,11 @@ public class DailyHoursCreationService {
 
     }
 
-    private LocalTime roundToNextTimeEndingIn5or0(LocalTime time) {
+    private LocalTime roundToNextTimeEndingIn5or0(final LocalTime time) {
+
         LocalTime adjusted = time;
-        int minutesMod5 = time.getMinute() % 5;
-        if(minutesMod5 != 0) {
+        final int minutesMod5 = time.getMinute() % 5;
+        if (minutesMod5 != 0) {
             adjusted = time.plusMinutes(5L - minutesMod5);
         }
 
@@ -232,38 +262,38 @@ public class DailyHoursCreationService {
         return adjusted;
     }
 
-    private boolean isLeilYomTovOrShabbos(LocalDate date, JewishCalendar nextDay) {
+    private boolean isLeilYomTovOrShabbos(final LocalDate date, final JewishCalendar nextDay) {
 
-        if(date.getDayOfWeek() == DayOfWeek.FRIDAY) {
+        if (date.getDayOfWeek() == DayOfWeek.FRIDAY)
             return true;
-        }
-        int yomTovIndex = nextDay.getYomTovIndex();
+        final int yomTovIndex = nextDay.getYomTovIndex();
         return YOM_TOV_INDEXES.contains(yomTovIndex);
 
     }
 
     private ComplexZmanimCalendar createCalendar() {
 
-        String locationName = "Los Angeles, CA";
-        double latitude = 34.0549987; // Los Angeles, CA
-        double longitude = -118.3969812; // Los Angeles, CA
-        double elevation = 65; // optional elevation
-        TimeZone timeZone = TimeZone.getTimeZone(config.getTimeZone());
-        GeoLocation location = new GeoLocation(locationName, latitude, longitude, elevation, timeZone);
+        final String locationName = "Los Angeles, CA";
+        final double latitude = 34.0549987; // Los Angeles, CA
+        final double longitude = -118.3969812; // Los Angeles, CA
+        final double elevation = 65; // optional elevation
+        final TimeZone timeZone = TimeZone.getTimeZone(config.getTimeZone());
+        final GeoLocation location = new GeoLocation(locationName, latitude, longitude, elevation, timeZone);
         return new ComplexZmanimCalendar(location);
 
     }
 
-    private ComplexZmanimCalendar createCalendar(LocalDate day) {
+    private ComplexZmanimCalendar createCalendar(final LocalDate day) {
 
-        ComplexZmanimCalendar complexZmanimCalendar = createCalendar();
+        final ComplexZmanimCalendar complexZmanimCalendar = createCalendar();
         complexZmanimCalendar.getCalendar().set(day.getYear(), day.getMonthValue() - 1, day.getDayOfMonth());
         return complexZmanimCalendar;
 
     }
 
-    private ZoneId getTimezone(){
-        if(timezone == null){
+    private ZoneId getTimezone() {
+
+        if (timezone == null) {
             timezone = ZoneId.of(config.getTimeZone());
         }
         return timezone;

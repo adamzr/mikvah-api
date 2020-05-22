@@ -9,6 +9,7 @@ import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import org.lamikvah.website.MikvahConfiguration;
 import org.lamikvah.website.dao.AppointmentSlotRepository;
@@ -19,7 +20,6 @@ import org.lamikvah.website.data.RoomType;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
-import org.springframework.util.CollectionUtils;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -62,29 +62,33 @@ public class AppointmentSlotCreationService {
             final LocalDateTime start = day.atStartOfDay();
             final LocalDateTime end = day.plusDays(1).atStartOfDay();
             for (final RoomType roomType : APPOINTMENT_ROOM_TYPE_TO_LIST_OF_START_TIME_OFFSETS.keySet()) {
-                final List<AppointmentSlot> slots = repo.findByStartBetweenAndRoomTypeOrderByStartAsc(start, end,
-                        roomType);
-                if (CollectionUtils.isEmpty(slots)) {
-                    final Optional<DailyHours> hoursOptional = dailyHoursRepo.findById(Date.valueOf(day));
-                    if (hoursOptional.isPresent()) {
-                        final DailyHours hours = hoursOptional.get();
-                        if (hours.isClosed() || isLeilYomTovOrShabbos(day)) {
-                            continue;
-                        }
-                        for (final int offset : APPOINTMENT_ROOM_TYPE_TO_LIST_OF_START_TIME_OFFSETS.get(roomType)) {
-                            createAppointments(roomType, day, hours, offset);
-                        }
+                final List<LocalDateTime> existingStartTimes = repo
+                        .findByStartBetweenAndRoomTypeOrderByStartAsc(start, end,
+                                roomType)
+                        .stream().map(AppointmentSlot::getStart).collect(Collectors.toList());
+                final Optional<DailyHours> hoursOptional = dailyHoursRepo.findById(Date.valueOf(day));
+                if (hoursOptional.isPresent()) {
+                    final DailyHours hours = hoursOptional.get();
+                    if (hours.isClosed() || isLeilYomTovOrShabbos(day)) {
+                        continue;
+                    }
+                    for (final int offset : APPOINTMENT_ROOM_TYPE_TO_LIST_OF_START_TIME_OFFSETS.get(roomType)) {
+                        createAppointments(roomType, day, hours, offset, existingStartTimes);
                     }
                 }
+
             }
         }
 
     }
 
     private void createAppointments(final RoomType roomType, final LocalDate day, final DailyHours hours,
-            final int offset) {
+            final int offset, final List<LocalDateTime> existingStartTimes) {
 
         LocalDateTime appointmentStart = LocalDateTime.of(day, hours.getOpening().toLocalTime().plusMinutes(offset));
+        if (existingStartTimes.contains(appointmentStart))
+            // We already created this appointment in a previous run
+            return;
         final LocalDateTime closing = LocalDateTime.of(hours.getDay().toLocalDate(), hours.getClosing().toLocalTime());
         while (!wouldEndAfterClosing(roomType, appointmentStart, closing)) {
             final AppointmentSlot slot = new AppointmentSlot();

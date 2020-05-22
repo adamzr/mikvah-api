@@ -53,4 +53,5 @@ public class DailyHours {
         return Optional.ofNullable(closing.toLocalTime());
 
     }
+    
 }
