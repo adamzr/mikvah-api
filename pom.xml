@@ -30,7 +30,7 @@
         <utils-mail-dkim.version>1.1.12</utils-mail-dkim.version>
         <mustache-compiler.version>0.9.6</mustache-compiler.version>
         <logback-ext-loggly.version>0.1.5</logback-ext-loggly.version>
-        <guava.version>28.0-jre</guava.version>
+        <guava.version>29.0-jre</guava.version>
         <junit.jupiter.version>5.5.0</junit.jupiter.version>
     </properties>
 
