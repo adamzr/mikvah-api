@@ -23,6 +23,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Sets;
 
 import lombok.extern.slf4j.Slf4j;
@@ -163,7 +164,8 @@ public class DailyHoursCreationService {
 
     }
 
-    private Time calculateClosing(final LocalTime opening) {
+    @VisibleForTesting
+    public Time calculateClosing(final LocalTime opening) {
 
         final LocalTime regularClosingTime = opening.plusHours(3);
         final LocalTime earlyClosingTime = opening.plusHours(2);
@@ -171,7 +173,7 @@ public class DailyHoursCreationService {
         LocalTime closingTime = regularClosingTime;
 
         // If regular closing time would be after 11pm
-        if (regularClosingTime.isAfter(LATEST_CLOSING_TIME)) {
+        if (regularClosingTime.isAfter(LATEST_CLOSING_TIME) || closingTime.getHour() < 12) {
             // then if 11pm would make the mikvah open for less than 2 hours
             if (Duration.between(opening, LATEST_CLOSING_TIME).compareTo(MINIMUM_OPEN_DURARTION) < 0) {
                 closingTime = earlyClosingTime; // close 2 hours after opening
