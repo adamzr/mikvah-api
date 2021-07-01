@@ -43,6 +43,8 @@ public class UserDto {
 
     boolean member;
 
+    boolean admin;
+
     Plan membershipPlan;
 
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")

@@ -41,36 +41,41 @@ import com.auth0.net.Request;
 @Component
 public class MikvahUserService {
 
-    @Autowired
-    private MikvahConfiguration config;
+    private final MikvahConfiguration config;
 
-    @Autowired
-    private MikvahUserRepository userRepository;
+    private final MikvahUserRepository userRepository;
 
-    @Autowired
-    private CreditCardService creditCardService;
+    private final CreditCardService creditCardService;
 
-    @Autowired
-    private AppointmentSlotRepository appointmentSlotRepository;
+    private final AppointmentSlotRepository appointmentSlotRepository;
 
-    @Autowired
-    private MembershipRepository membershipRepository;
+    private final MembershipRepository membershipRepository;
 
-    @Autowired
-    @Lazy
-    private Optional<EmailService> emailService;
+    private final EmailService emailService;
 
-    @Autowired
-    private DailyHoursService dailyHoursService;
+    private final DailyHoursService dailyHoursService;
 
     private final ManagementAPI auth0ManagementApi;
 
     private static final UserFilter NO_OP_USER_FILTER = new UserFilter();
 
     @Autowired
-    public MikvahUserService(@Autowired final MikvahConfiguration config) {
+    public MikvahUserService(MikvahConfiguration config,
+                             MikvahUserRepository userRepository,
+                             AppointmentSlotRepository appointmentSlotRepository,
+                             MembershipRepository membershipRepository,
+                             CreditCardService creditCardService,
+                             @Lazy EmailService emailService,
+                             DailyHoursService dailyHoursService) {
 
         auth0ManagementApi = new ManagementAPI(config.getAuth0().getIssuer(), config.getAuth0().getManagementToken());
+        this.config = config;
+        this.userRepository = userRepository;
+        this.appointmentSlotRepository = appointmentSlotRepository;
+        this.membershipRepository = membershipRepository;
+        this.creditCardService = creditCardService;
+        this.emailService = emailService;
+        this.dailyHoursService = dailyHoursService;
     }
 
     private String getUserEmail(final String principalName) throws Auth0Exception {
@@ -135,7 +140,7 @@ public class MikvahUserService {
                 final MikvahUser newUser = new MikvahUser();
                 newUser.setAuth0UserId(auth0UserId);
                 newUser.setEmail(email);
-                emailService.get().sendWelcomeEmail(newUser);
+                emailService.sendWelcomeEmail(newUser);
                 return userRepository.save(newUser);
             } else {
                 final MikvahUser partialUser = user.get();
@@ -205,6 +210,7 @@ public class MikvahUserService {
                 .phoneNumber(user.getPhoneNumber())
                 .notes(user.getNotes())
                 .member(user.isMember())
+                .admin(user.isAdmin())
                 .stripeCustomerId(user.getStripeCustomerId())
                 .title(user.getTitle())
                 .defaultCard(defaultCard)
