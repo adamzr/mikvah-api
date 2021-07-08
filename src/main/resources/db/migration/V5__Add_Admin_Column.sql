@@ -1,0 +1,2 @@
+ALTER TABLE mikvah_user
+ADD admin bool NOT NULL DEFAULT FALSE;

@@ -8,6 +8,7 @@ import javax.persistence.Id;
 import javax.persistence.Index;
 import javax.persistence.Table;
 
+import lombok.Builder;
 import org.springframework.util.StringUtils;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
@@ -20,6 +21,7 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@Builder
 @Entity
 @Table(indexes= {
         @Index(columnList="auth0_user_id", name="mikvah_user_auth0_user_id_idx"),
@@ -48,6 +50,8 @@ public class MikvahUser {
     private String stripeCustomerId;
 
     private boolean member;
+
+    private boolean admin;
 
     private String notes;
 
