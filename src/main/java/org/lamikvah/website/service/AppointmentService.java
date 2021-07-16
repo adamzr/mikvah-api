@@ -24,6 +24,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.lamikvah.website.MikvahConfiguration;
 import org.lamikvah.website.dao.AppointmentSlotRepository;
 import org.lamikvah.website.dao.ReservationHistoryLogRepository;
+import org.lamikvah.website.data.AdminAppointmentView;
 import org.lamikvah.website.data.AppointmentAction;
 import org.lamikvah.website.data.AppointmentRequest;
 import org.lamikvah.website.data.AppointmentSlot;
@@ -272,6 +273,26 @@ public class AppointmentService {
             .notes(slot.getNotes()).build())
         .sorted(Comparator.comparing(AttendentAppointmentView::getTime))
         .collect(Collectors.toList());
+
+  }
+
+  public List<AdminAppointmentView> getAppointmentsForAdmins(LocalDate date) {
+
+    final List<AppointmentSlot> slots = appointmentSlotRepository.findByStartBetweenOrderByStartAsc(date.atStartOfDay(),
+            date.atTime(LocalTime.MAX));
+
+    return slots.stream()
+            .filter(slot -> slot.getMikvahUser() != null)
+            .map(slot -> AdminAppointmentView.builder()
+                    .title(slot.getMikvahUser().getTitle())
+                    .firstName(slot.getMikvahUser().getFirstName())
+                    .lastName(slot.getMikvahUser().getLastName())
+                    .email(slot.getMikvahUser().getEmail())
+                    .phoneNumber(slot.getMikvahUser().getPhoneNumber())
+                    .time(slot.getStart().toLocalTime().format(TIME_FORMAT))
+                    .roomType(slot.getRoomType().name().toLowerCase())
+                    .notes(slot.getNotes()).build())
+            .collect(Collectors.toList());
 
   }
 
