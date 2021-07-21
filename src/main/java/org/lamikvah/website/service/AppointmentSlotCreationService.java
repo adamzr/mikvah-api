@@ -30,7 +30,7 @@ public class AppointmentSlotCreationService {
 
   private static final Map<RoomType, Duration> ROOM_TYPE_TO_APPOINTMENT_LENGTH =
       ImmutableMap.of(RoomType.SHOWER,
-          Duration.ofMinutes(30), RoomType.BATH, Duration.ofMinutes(60));
+          Duration.ofMinutes(30), RoomType.BATH, Duration.ofMinutes(75));
 
   private static final long ONE_HOUR_IN_MILLSECONDS = 3600000;
 
@@ -38,7 +38,7 @@ public class AppointmentSlotCreationService {
 
   private static final Map<RoomType,
       List<Integer>> APPOINTMENT_ROOM_TYPE_TO_LIST_OF_START_TIME_OFFSETS = ImmutableMap
-          .of(RoomType.SHOWER, ImmutableList.of(0, 0, 5, 5, 10), // 5 showers
+          .of(RoomType.SHOWER, ImmutableList.of(25, 25, 30, 30, 35), // 5 showers
               RoomType.BATH, ImmutableList.of(0, 0, 5, 5, 10, 10, 10)); // 7 baths
 
   @Autowired
@@ -65,6 +65,9 @@ public class AppointmentSlotCreationService {
             .findByStartBetweenAndRoomTypeOrderByStartAsc(start, end,
                 roomType)
             .stream().map(AppointmentSlot::getStart).collect(Collectors.toList());
+        if (!existingStartTimes.isEmpty()) {
+          continue;
+        }
         final Optional<DailyHours> hoursOptional = dailyHoursRepo.findById(Date.valueOf(day));
         if (hoursOptional.isPresent()) {
           final DailyHours hours = hoursOptional.get();
