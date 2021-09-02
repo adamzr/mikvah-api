@@ -36,7 +36,6 @@ public class SecurityConfiguration extends WebSecurityConfigurerAdapter {
                 .antMatchers(HttpMethod.GET, "/info").permitAll()
                 .antMatchers(HttpMethod.POST, "/webhook").permitAll()
                 .antMatchers(HttpMethod.GET, "/attendent-daily-list").permitAll()
-                .antMatchers(HttpMethod.POST, "/admin-daily-list").permitAll()
                 .antMatchers(HttpMethod.GET, "/health").permitAll()
                 .anyRequest().authenticated();
 
