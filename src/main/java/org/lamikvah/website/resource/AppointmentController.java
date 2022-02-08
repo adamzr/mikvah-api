@@ -1,28 +1,17 @@
 package org.lamikvah.website.resource;
 
-import java.util.List;
-import java.util.Optional;
-
-import javax.servlet.http.HttpServletRequest;
-
-import org.lamikvah.website.data.AppointmentCreationResponse;
-import org.lamikvah.website.data.AppointmentRequest;
-import org.lamikvah.website.data.AppointmentSlotDto;
-import org.lamikvah.website.data.AvailableDateTimeAndRoomType;
-import org.lamikvah.website.data.MikvahUser;
+import lombok.extern.slf4j.Slf4j;
+import org.lamikvah.website.data.*;
 import org.lamikvah.website.exception.AppointmentCreationException;
+import org.lamikvah.website.exception.UnauthorizedException;
 import org.lamikvah.website.service.AppointmentService;
 import org.lamikvah.website.service.MikvahUserService;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.CrossOrigin;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
-import lombok.extern.slf4j.Slf4j;
+import javax.servlet.http.HttpServletRequest;
+import java.util.List;
+import java.util.Optional;
 
 @CrossOrigin
 @RestController
@@ -43,7 +32,7 @@ public class AppointmentController {
 
     @PostMapping("/appointments")
     public AppointmentCreationResponse createAppointment(@RequestBody final AppointmentRequest appointmentRequest,
-            final HttpServletRequest request) {
+                                                         final HttpServletRequest request) {
 
         final MikvahUser user = mikvahUserService.getUser(request);
         try {
@@ -54,6 +43,28 @@ public class AppointmentController {
                     .message("Your appointment was created successfully!")
                     .build();
         } catch (final AppointmentCreationException e) {
+            return AppointmentCreationResponse.builder()
+                    .message(e.getMessage())
+                    .build();
+        }
+    }
+
+    @PostMapping("/appointments/{id}")
+    public AppointmentCreationResponse editAppointment(@PathVariable("id") long id,
+                                                       @RequestBody UpdateAppointmentRequest appointmentRequest,
+                                                       HttpServletRequest servletRequest) {
+        final MikvahUser user = mikvahUserService.getUser(servletRequest);
+
+        if (!user.isAdmin()) {
+            throw new UnauthorizedException("You are not authorized to edit appointments.");
+        }
+        try {
+            final AppointmentSlotDto slot = appointmentService.editAppointment(id, appointmentRequest);
+            return AppointmentCreationResponse.builder()
+                    .slot(slot)
+                    .message("Your appointment was modified successfully!")
+                    .build();
+        } catch (AppointmentCreationException e) {
             return AppointmentCreationResponse.builder()
                     .message(e.getMessage())
                     .build();

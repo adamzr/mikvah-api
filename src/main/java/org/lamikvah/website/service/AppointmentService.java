@@ -24,16 +24,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.lamikvah.website.MikvahConfiguration;
 import org.lamikvah.website.dao.AppointmentSlotRepository;
 import org.lamikvah.website.dao.ReservationHistoryLogRepository;
-import org.lamikvah.website.data.AdminAppointmentView;
-import org.lamikvah.website.data.AppointmentAction;
-import org.lamikvah.website.data.AppointmentRequest;
-import org.lamikvah.website.data.AppointmentSlot;
-import org.lamikvah.website.data.AppointmentSlotDto;
-import org.lamikvah.website.data.AttendentAppointmentView;
-import org.lamikvah.website.data.AvailableDateTimeAndRoomType;
-import org.lamikvah.website.data.DailyHours;
-import org.lamikvah.website.data.MikvahUser;
-import org.lamikvah.website.data.ReservationHistoryLog;
+import org.lamikvah.website.data.*;
 import org.lamikvah.website.exception.AppointmentCreationException;
 import org.lamikvah.website.exception.ServerErrorException;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -120,7 +111,7 @@ public class AppointmentService {
             appointmentRequest.getRoomType());
     if (CollectionUtils.isEmpty(possibleSlots)) {
       log.warn(
-          "User {} tried to make an appointment {} but there were no appoitment slots available!",
+          "User {} tried to make an appointment {} but there were no appointment slots available!",
           user,
           appointmentRequest);
       throw new AppointmentCreationException(
@@ -159,6 +150,64 @@ public class AppointmentService {
   }
 
   @Transactional(isolation = Isolation.SERIALIZABLE, timeout = 10)
+  public AppointmentSlotDto editAppointment(long slotId, UpdateAppointmentRequest appointmentRequest) {
+    final AppointmentSlot existingSlot = appointmentSlotRepository.findById(slotId)
+            .orElseThrow(() -> new AppointmentCreationException("The specified appointment does not exist."));
+
+    final LocalDateTime requestedTime = appointmentRequest.getTime();
+
+    final List<AppointmentSlot> possibleSlots = appointmentSlotRepository
+            .findByStartAndRoomTypeAndMikvahUserIsNullOrderByIdAsc(requestedTime,
+                    existingSlot.getRoomType());
+    if (CollectionUtils.isEmpty(possibleSlots)) {
+      log.warn(
+              "Tried to reschedule appointment {} to {}, but there were no appointment slots available!",
+              slotId,
+              appointmentRequest.getTime());
+      throw new AppointmentCreationException(
+              "There were no available appointments for the requested time. Please try a different time.");
+    }
+
+    final AppointmentSlot newSlot = possibleSlots.get(0);
+    newSlot.setMikvahUser(existingSlot.getMikvahUser());
+    newSlot.setNotes(existingSlot.getNotes());
+    newSlot.setStripeChargeId(existingSlot.getStripeChargeId());
+
+    final AppointmentSlot savedSlot = appointmentSlotRepository.save(newSlot);
+
+    //TODO: what kind of auditing do we need?
+    final ReservationHistoryLog createdLog = ReservationHistoryLog.builder()
+            .action(AppointmentAction.MADE).appointmentSlot(savedSlot)
+            .created(LocalDateTime.now(Clock.systemUTC()))
+            .mikvahUser(savedSlot.getMikvahUser())
+            .stripeId(savedSlot.getStripeChargeId())
+            .build();
+    reservationHistoryLogRepository.save(createdLog);
+
+    existingSlot.setMikvahUser(null);
+    existingSlot.setNotes(null);
+    existingSlot.setStripeChargeId(null);
+    appointmentSlotRepository.save(existingSlot);
+
+    final ReservationHistoryLog canceledLog = ReservationHistoryLog.builder()
+            .action(AppointmentAction.CANCELED).appointmentSlot(existingSlot)
+            .created(LocalDateTime.now(Clock.systemUTC()))
+            .mikvahUser(existingSlot.getMikvahUser()).build();
+    reservationHistoryLogRepository.save(canceledLog);
+
+    emailService.sendAppointmentConfirmationEmail(savedSlot.getMikvahUser(), savedSlot);
+
+    log.info("Updated appointment {}", savedSlot);
+
+    return AppointmentSlotDto.builder()
+            .id(savedSlot.getId())
+            .start(savedSlot.getStart())
+            .notes(savedSlot.getNotes())
+            .roomType(savedSlot.getRoomType())
+            .build();
+  }
+
+  @Transactional(isolation = Isolation.SERIALIZABLE, timeout = 10)
   public Optional<String> cancelAppointment(final MikvahUser user, final long slotId) {
 
     final Optional<AppointmentSlot> existingSlot = appointmentSlotRepository.findById(slotId);
@@ -169,7 +218,7 @@ public class AppointmentService {
     if (slot.getMikvahUser() == null) {
       return Optional.empty();
     }
-    if (!slot.getMikvahUser().equals(user)) {
+    if (!slot.getMikvahUser().equals(user) && !user.isAdmin()) {
       throw new ServerErrorException("You can only cancel your own appointment.");
     }
     final LocalDateTime now = LocalDateTime.now(ZoneId.of(config.getTimeZone()));
@@ -284,6 +333,7 @@ public class AppointmentService {
     return slots.stream()
             .filter(slot -> slot.getMikvahUser() != null)
             .map(slot -> AdminAppointmentView.builder()
+                    .id(slot.getId())
                     .title(slot.getMikvahUser().getTitle())
                     .firstName(slot.getMikvahUser().getFirstName())
                     .lastName(slot.getMikvahUser().getLastName())
