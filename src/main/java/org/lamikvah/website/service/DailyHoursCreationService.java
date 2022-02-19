@@ -55,9 +55,11 @@ public class DailyHoursCreationService {
   private static final LocalTime EARLIEST_CLOSING_TIME = LocalTime.of(21, 30);
 
   /**
-   * Mikvah should always be open for at least 2 hours and 45 minutes
+   * Mikvah should always be open for at least 2 hours
    */
-  private static final Duration MINIMUM_OPEN_DURARTION = Duration.ofHours(2).plusMinutes(45);
+  private static final Duration MINIMUM_OPEN_DURARTION = Duration.ofHours(2);
+
+  private static final int OPEN_EARLY_MINUTES = 45;
 
   @Autowired
   private DailyHoursRepository repo;
@@ -65,7 +67,7 @@ public class DailyHoursCreationService {
   @Autowired
   private MikvahConfiguration config;
 
-  @Scheduled(initialDelay = 0, fixedRate = ONE_HOUR)
+  @Scheduled(initialDelay = ONE_HOUR, fixedRate = ONE_HOUR)
   public void createHoursForNext3Weeks() {
 
     log.debug("Calculating hours for next 3 weeks.");
@@ -124,7 +126,7 @@ public class DailyHoursCreationService {
       hours.setClosed(false);
       final LocalTime opening = roundToNextTimeEndingIn5or0(dayContext.getTzeis().plusHours(1));
       hours.setOpening(Time.valueOf(opening));
-      hours.setClosing(calculateClosing(opening));
+      hours.setClosing(calculateClosing(opening, false));
       return hours;
     }
 
@@ -133,7 +135,7 @@ public class DailyHoursCreationService {
       final LocalTime opening = roundToNextTimeEndingIn5or0(
           dayContext.getLatestTzeisForWeekRoundedUpToNearestFiveMinutes().plusHours(1));
       hours.setOpening(Time.valueOf(opening));
-      hours.setClosing(calculateClosing(opening));
+      hours.setClosing(calculateClosing(opening, false));
       return hours;
     }
 
@@ -142,7 +144,7 @@ public class DailyHoursCreationService {
       final LocalTime opening = roundToNextTimeEndingIn5or0(
           dayContext.getLatestTzeisForWeekRoundedUpToNearestFiveMinutes().plusHours(1));
       hours.setOpening(Time.valueOf(opening));
-      hours.setClosing(calculateClosing(opening));
+      hours.setClosing(calculateClosing(opening, false));
       return hours;
     }
 
@@ -150,31 +152,38 @@ public class DailyHoursCreationService {
       hours.setClosed(false);
       final LocalTime opening = roundToNextTimeEndingIn5or0(dayContext.getTzeis().plusMinutes(45));
       hours.setOpening(Time.valueOf(opening));
-      hours.setClosing(calculateClosing(opening));
+      hours.setClosing(calculateClosing(opening, false));
       return hours;
     }
 
     hours.setClosed(false);
     final LocalTime opening =
-        dayContext.getLatestTzeisForWeekRoundedUpToNearestFiveMinutes().minusMinutes(45);
+        dayContext.getLatestTzeisForWeekRoundedUpToNearestFiveMinutes()
+            .minusMinutes(OPEN_EARLY_MINUTES);
     hours.setOpening(Time.valueOf(opening));
-    hours.setClosing(calculateClosing(opening));
+    hours.setClosing(calculateClosing(opening, true));
     return hours;
 
   }
 
   @VisibleForTesting
-  public Time calculateClosing(final LocalTime opening) {
+  public Time calculateClosing(final LocalTime opening, final boolean openedEarly) {
 
-    final LocalTime regularClosingTime = opening.plusHours(3).plusMinutes(45);
-    final LocalTime earlyClosingTime = opening.plusHours(2).plusMinutes(45);
+    final LocalTime regularClosingTime = opening.plusHours(3);
+    final LocalTime earlyClosingTime = opening.plusHours(2);
+    final Duration minimumOpenDuration = MINIMUM_OPEN_DURARTION;
+    if (openedEarly) {
+      regularClosingTime.plusMinutes(OPEN_EARLY_MINUTES);
+      earlyClosingTime.plusMinutes(OPEN_EARLY_MINUTES);
+      minimumOpenDuration.plusMinutes(OPEN_EARLY_MINUTES);
+    }
 
     LocalTime closingTime = regularClosingTime;
 
     // If regular closing time would be after 11:15 pm
     if (regularClosingTime.isAfter(LATEST_CLOSING_TIME) || closingTime.getHour() < 12) {
-      // then if 11pm would make the mikvah open for less than 2 hours and 45 minutes
-      if (Duration.between(opening, LATEST_CLOSING_TIME).compareTo(MINIMUM_OPEN_DURARTION) < 0) {
+      // then if 11pm would make the mikvah open for less than 2 hours
+      if (Duration.between(opening, LATEST_CLOSING_TIME).compareTo(minimumOpenDuration) < 0) {
         closingTime = earlyClosingTime; // close 2 hours after opening
       } else {
         closingTime = LATEST_CLOSING_TIME; // otherwise, close at 11pm
