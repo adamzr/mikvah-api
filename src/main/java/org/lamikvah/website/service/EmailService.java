@@ -1,5 +1,11 @@
 package org.lamikvah.website.service;
 
+import com.github.benmanes.caffeine.cache.Caffeine;
+import com.github.benmanes.caffeine.cache.LoadingCache;
+import com.github.mustachejava.DefaultMustacheFactory;
+import com.github.mustachejava.Mustache;
+import com.github.mustachejava.MustacheFactory;
+import com.stripe.model.Invoice;
 import java.io.StringWriter;
 import java.text.NumberFormat;
 import java.time.Instant;
@@ -12,9 +18,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
-
-import javax.mail.internet.MimeMessage.RecipientType;
-
+import lombok.extern.slf4j.Slf4j;
 import org.lamikvah.website.MikvahConfiguration;
 import org.lamikvah.website.dao.MikvahUserRepository;
 import org.lamikvah.website.data.AppointmentSlot;
@@ -26,422 +30,460 @@ import org.simplejavamail.email.EmailBuilder;
 import org.simplejavamail.email.Recipient;
 import org.simplejavamail.mailer.Mailer;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
-
-import com.github.benmanes.caffeine.cache.Caffeine;
-import com.github.benmanes.caffeine.cache.LoadingCache;
-import com.github.mustachejava.DefaultMustacheFactory;
-import com.github.mustachejava.Mustache;
-import com.github.mustachejava.MustacheFactory;
-import com.stripe.model.Invoice;
-
-import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @Component
 public class EmailService {
 
-    private static final String EXPIRATION_DATE = "expirationDate";
+  private static final String EXPIRATION_DATE = "expirationDate";
 
-    private static final String AMOUNT = "amount";
+  private static final String AMOUNT = "amount";
 
-    private static final String LAST4 = "last4";
+  private static final String LAST4 = "last4";
 
-    private static final int CENTS_PER_DOLLAR = 100;
+  private static final int CENTS_PER_DOLLAR = 100;
 
-    private static final DateTimeFormatter FRIENDLY_FORMAT = DateTimeFormatter
-            .ofPattern("EEEE, MMMM, d, yyyy 'at' h:mm a");
+  private static final DateTimeFormatter FRIENDLY_FORMAT = DateTimeFormatter
+      .ofPattern("EEEE, MMMM, d, yyyy 'at' h:mm a");
 
-    @Autowired
-    private Mailer mailer;
-    @Autowired
-    private MikvahConfiguration config;
-    @Autowired
-    private CreditCardService creditCardService;
-    @Autowired
-    private MikvahUserRepository userRepository;
+  @Autowired
+  private Mailer mailer;
 
-    private MustacheFactory mf = new DefaultMustacheFactory();
-    private NumberFormat currencyFormatter = NumberFormat.getCurrencyInstance();
+  @Autowired
+  private MikvahConfiguration config;
 
-    private final LoadingCache<String, Mustache> mustacheTemplateCache = Caffeine.newBuilder().maximumSize(100)
-            .build(templateFileName -> mf.compile(templateFileName));
+  @Autowired
+  @Lazy
+  private CreditCardService creditCardService;
 
-    @Async
-    public void sendAppointmentConfirmationEmail(MikvahUser user, AppointmentSlot appointment) {
+  @Autowired
+  private MikvahUserRepository userRepository;
 
-        try {
+  private final MustacheFactory mf = new DefaultMustacheFactory();
+  private final NumberFormat currencyFormatter = NumberFormat.getCurrencyInstance();
 
-            Mustache htmlMustache = mustacheTemplateCache.get("emails/appointment-confirmation.html.mustache");
+  private final LoadingCache<String, Mustache> mustacheTemplateCache =
+      Caffeine.newBuilder().maximumSize(100)
+          .build(templateFileName -> mf.compile(templateFileName));
 
-            Mustache txtMustache = mustacheTemplateCache.get("emails/appointment-confirmation.txt.mustache");
+  @Async
+  public void sendAppointmentConfirmationEmail(final MikvahUser user,
+      final AppointmentSlot appointment) {
 
-            Map<String, Object> context = new HashMap<>();
-            context.put("appointmentSlotId", appointment.getId());
-            context.put("fullName", user.getFullName());
-            context.put("isoStartTime", appointment.getStart().atZone(ZoneId.of(config.getTimeZone()))
-                    .format(DateTimeFormatter.ISO_OFFSET_DATE_TIME));
-            context.put("isoModifiedTime", LocalDateTime.now().atZone(ZoneId.of(config.getTimeZone()))
-                    .format(DateTimeFormatter.ISO_OFFSET_DATE_TIME));
-            context.put("startDateTime",
-                    appointment.getStart().atZone(ZoneId.of(config.getTimeZone())).format(FRIENDLY_FORMAT));
-            context.put("ccCharged", !StringUtils.isEmpty(appointment.getStripeChargeId()));
-            Optional<CreditCard> creditCardOptional = creditCardService.getCreditCard(user);
-            if (creditCardOptional.isPresent()) {
-                CreditCard creditCard = creditCardOptional.get();
-                context.put("cardType", creditCard.getBrand());
-                context.put(LAST4, creditCard.getLast4());
-            }
-            context.put("confirmationCode", appointment.getStripeChargeId());
-            context.put(AMOUNT, currencyFormatter.format(config.getAppointmentCost() / CENTS_PER_DOLLAR));
+    try {
 
-            sendEmail(user, htmlMustache, txtMustache, context, "Your Appointment Is Confirmed!");
+      final Mustache htmlMustache =
+          mustacheTemplateCache.get("emails/appointment-confirmation.html.mustache");
 
-        } catch (Exception e) {
-            log.error("There was a problem sending the appointment confirmation email.", e);
-        }
+      final Mustache txtMustache =
+          mustacheTemplateCache.get("emails/appointment-confirmation.txt.mustache");
+
+      final Map<String, Object> context = new HashMap<>();
+      context.put("appointmentSlotId", appointment.getId());
+      context.put("fullName", user.getFullName());
+      context.put("isoStartTime", appointment.getStart().atZone(ZoneId.of(config.getTimeZone()))
+          .format(DateTimeFormatter.ISO_OFFSET_DATE_TIME));
+      context.put("isoModifiedTime", LocalDateTime.now().atZone(ZoneId.of(config.getTimeZone()))
+          .format(DateTimeFormatter.ISO_OFFSET_DATE_TIME));
+      context.put("startDateTime",
+          appointment.getStart().atZone(ZoneId.of(config.getTimeZone())).format(FRIENDLY_FORMAT));
+      context.put("ccCharged", !StringUtils.isEmpty(appointment.getStripeChargeId()));
+      final Optional<CreditCard> creditCardOptional = creditCardService.getCreditCard(user);
+      if (creditCardOptional.isPresent()) {
+        final CreditCard creditCard = creditCardOptional.get();
+        context.put("cardType", creditCard.getBrand());
+        context.put(LAST4, creditCard.getLast4());
+      }
+      context.put("confirmationCode", appointment.getStripeChargeId());
+      context.put(AMOUNT, currencyFormatter.format(config.getAppointmentCost() / CENTS_PER_DOLLAR));
+
+      sendEmail(user, htmlMustache, txtMustache, context, "Your Appointment Is Confirmed!");
+
+    } catch (final Exception e) {
+      log.error("There was a problem sending the appointment confirmation email.", e);
     }
+  }
 
-    @Async
-    public void sendAppointmentCancellationEmail(MikvahUser user, AppointmentSlot appointment,
-            Optional<String> refundId) {
+  @Async
+  public void sendAppointmentCancellationEmail(final MikvahUser user,
+      final AppointmentSlot appointment,
+      final Optional<String> refundId) {
 
-        try {
+    try {
 
-            Mustache htmlMustache = mustacheTemplateCache.get("emails/appointment-cancellation.html.mustache");
+      final Mustache htmlMustache =
+          mustacheTemplateCache.get("emails/appointment-cancellation.html.mustache");
 
-            Mustache txtMustache = mustacheTemplateCache.get("emails/appointment-cancellation.txt.mustache");
+      final Mustache txtMustache =
+          mustacheTemplateCache.get("emails/appointment-cancellation.txt.mustache");
 
-            Map<String, Object> context = new HashMap<>();
-            context.put("appointmentSlotId", appointment.getId());
-            context.put("fullName", user.getFullName());
-            context.put("isoStartTime", appointment.getStart().atZone(ZoneId.of(config.getTimeZone()))
-                    .format(DateTimeFormatter.ISO_OFFSET_DATE_TIME));
-            context.put("isoModifiedTime", LocalDateTime.now().atZone(ZoneId.of(config.getTimeZone()))
-                    .format(DateTimeFormatter.ISO_OFFSET_DATE_TIME));
-            context.put("startDateTime",
-                    appointment.getStart().atZone(ZoneId.of(config.getTimeZone())).format(FRIENDLY_FORMAT));
-            context.put("ccRefunded", refundId.isPresent());
-            context.put("confirmationCode", refundId.orElse(null));
-            context.put(AMOUNT, currencyFormatter.format(config.getAppointmentCost() / CENTS_PER_DOLLAR));
+      final Map<String, Object> context = new HashMap<>();
+      context.put("appointmentSlotId", appointment.getId());
+      context.put("fullName", user.getFullName());
+      context.put("isoStartTime", appointment.getStart().atZone(ZoneId.of(config.getTimeZone()))
+          .format(DateTimeFormatter.ISO_OFFSET_DATE_TIME));
+      context.put("isoModifiedTime", LocalDateTime.now().atZone(ZoneId.of(config.getTimeZone()))
+          .format(DateTimeFormatter.ISO_OFFSET_DATE_TIME));
+      context.put("startDateTime",
+          appointment.getStart().atZone(ZoneId.of(config.getTimeZone())).format(FRIENDLY_FORMAT));
+      context.put("ccRefunded", refundId.isPresent());
+      context.put("confirmationCode", refundId.orElse(null));
+      context.put(AMOUNT, currencyFormatter.format(config.getAppointmentCost() / CENTS_PER_DOLLAR));
 
-            sendEmail(user, htmlMustache, txtMustache, context, "You're Appointment Has Been Cancelled");
+      sendEmail(user, htmlMustache, txtMustache, context, "You're Appointment Has Been Cancelled");
 
-        } catch (Exception e) {
-            log.error("There was a problem sending the appointment cancellation email.", e);
-        }
+    } catch (final Exception e) {
+      log.error("There was a problem sending the appointment cancellation email.", e);
     }
+  }
 
-    @Async
-    public void sendWelcomeEmail(MikvahUser user) {
+  @Async
+  public void sendWelcomeEmail(final MikvahUser user) {
 
-        try {
+    try {
 
-            Mustache htmlMustache = mustacheTemplateCache.get("emails/welcome.html.mustache");
+      final Mustache htmlMustache = mustacheTemplateCache.get("emails/welcome.html.mustache");
 
-            Mustache txtMustache = mustacheTemplateCache.get("emails/welcome.txt.mustache");
+      final Mustache txtMustache = mustacheTemplateCache.get("emails/welcome.txt.mustache");
 
-            Map<String, Object> context = new HashMap<>();
+      final Map<String, Object> context = new HashMap<>();
 
-            sendEmail(user, htmlMustache, txtMustache, context,
-                    "Welcome to the Los Angeles Mikvah Society - Mikvat Esteher Website");
+      sendEmail(user, htmlMustache, txtMustache, context,
+          "Welcome to the Los Angeles Mikvah Society - Mikvat Esteher Website");
 
-        } catch (Exception e) {
-            log.error("There was a problem sending the welcome email.", e);
-        }
+    } catch (final Exception e) {
+      log.error("There was a problem sending the welcome email.", e);
     }
+  }
 
-    @Async
-    public void sendNewMemberEmail(MikvahUser user, Membership membership) {
-        try {
+  @Async
+  public void sendNewMemberEmail(final MikvahUser user, final Membership membership) {
+    try {
 
-            Mustache htmlMustache = mustacheTemplateCache.get("emails/new-membership.html.mustache");
+      final Mustache htmlMustache =
+          mustacheTemplateCache.get("emails/new-membership.html.mustache");
 
-            Mustache txtMustache = mustacheTemplateCache.get("emails/new-membership.txt.mustache");
+      final Mustache txtMustache = mustacheTemplateCache.get("emails/new-membership.txt.mustache");
 
-            Map<String, Object> context = new HashMap<>();
-            context.put("level", membership.getPlan().name());
-            context.put(EXPIRATION_DATE, membership.getExpiration().format(FRIENDLY_FORMAT));
-            Optional<CreditCard> creditCard = creditCardService.getCreditCard(user);
-            if (creditCard.isPresent()) {
-                context.put(LAST4, creditCard.get().getLast4());
-            } else {
-                context.put(LAST4, "XXXX");
-            }
-            context.put("autoRenewEnabled", membership.isAutoRenewEnabled());
-            context.put("date", FRIENDLY_FORMAT.format(LocalDateTime.now()));
-            context.put(AMOUNT, membership.getPlan().getFormattedPrice());
-            sendEmail(user, htmlMustache, txtMustache, context, "Mikvah Membership");
+      final Map<String, Object> context = new HashMap<>();
+      context.put("level", membership.getPlan().name());
+      context.put(EXPIRATION_DATE, membership.getExpiration().format(FRIENDLY_FORMAT));
+      final Optional<CreditCard> creditCard = creditCardService.getCreditCard(user);
+      if (creditCard.isPresent()) {
+        context.put(LAST4, creditCard.get().getLast4());
+      } else {
+        context.put(LAST4, "XXXX");
+      }
+      context.put("autoRenewEnabled", membership.isAutoRenewEnabled());
+      context.put("date", FRIENDLY_FORMAT.format(LocalDateTime.now()));
+      context.put(AMOUNT, membership.getPlan().getFormattedPrice());
+      sendEmail(user, htmlMustache, txtMustache, context, "Mikvah Membership");
 
-        } catch (Exception e) {
+    } catch (final Exception e) {
 
-            log.error("There was a problem sending the mikvah membership start email.", e);
-
-        }
-
-        sendMembershipPaymentNotificationEmail(user.getFullName(), membership.getPlan().getFormattedPrice());
-
-    }
-
-    @Async
-    public void sendMembershipRenewalEmail(MikvahUser user, Membership membership) {
-        try {
-
-            Mustache htmlMustache = mustacheTemplateCache.get("emails/membership-renewal.html.mustache");
-
-            Mustache txtMustache = mustacheTemplateCache.get("emails/membership-renewal.txt.mustache");
-
-            Map<String, Object> context = new HashMap<>();
-            context.put("level", membership.getPlan().name());
-            context.put(EXPIRATION_DATE, membership.getExpiration().format(FRIENDLY_FORMAT));
-            Optional<CreditCard> creditCard = creditCardService.getCreditCard(user);
-            if (creditCard.isPresent()) {
-                context.put(LAST4, creditCard.get().getLast4());
-            } else {
-                context.put(LAST4, "XXXX");
-            }
-            context.put("autoRenewEnabled", membership.isAutoRenewEnabled());
-            context.put("date", FRIENDLY_FORMAT.format(LocalDateTime.now()));
-            context.put(AMOUNT, membership.getPlan().getFormattedPrice());
-
-            sendEmail(user, htmlMustache, txtMustache, context, "Mikvah Membership Renewal");
-
-        } catch (Exception e) {
-
-            log.error("There was a problem sending the mikvah membership renewal email.", e);
-
-        }
-
-        sendMembershipPaymentNotificationEmail(user.getFullName(), membership.getPlan().getFormattedPrice());
+      log.error("There was a problem sending the mikvah membership start email.", e);
 
     }
 
-    @Async
-    public void sendCreditCardUpdateEmail(MikvahUser user, Optional<Membership> membership) {
-        try {
+    sendMembershipPaymentNotificationEmail(user.getFullName(),
+        membership.getPlan().getFormattedPrice());
 
-            Mustache htmlMustache = mustacheTemplateCache.get("emails/credit-card-update.html.mustache");
+  }
 
-            Mustache txtMustache = mustacheTemplateCache.get("emails/credit-card-update.txt.mustache");
+  @Async
+  public void sendMembershipRenewalEmail(final MikvahUser user, final Membership membership) {
+    try {
 
-            Map<String, Object> context = new HashMap<>();
+      final Mustache htmlMustache =
+          mustacheTemplateCache.get("emails/membership-renewal.html.mustache");
 
-            context.put("isAutoRenewingMember", membership.isPresent() && membership.get().isAutoRenewEnabled());
+      final Mustache txtMustache =
+          mustacheTemplateCache.get("emails/membership-renewal.txt.mustache");
 
-            sendEmail(user, htmlMustache, txtMustache, context, "Credit Card Update");
+      final Map<String, Object> context = new HashMap<>();
+      context.put("level", membership.getPlan().name());
+      context.put(EXPIRATION_DATE, membership.getExpiration().format(FRIENDLY_FORMAT));
+      final Optional<CreditCard> creditCard = creditCardService.getCreditCard(user);
+      if (creditCard.isPresent()) {
+        context.put(LAST4, creditCard.get().getLast4());
+      } else {
+        context.put(LAST4, "XXXX");
+      }
+      context.put("autoRenewEnabled", membership.isAutoRenewEnabled());
+      context.put("date", FRIENDLY_FORMAT.format(LocalDateTime.now()));
+      context.put(AMOUNT, membership.getPlan().getFormattedPrice());
 
-        } catch (Exception e) {
+      sendEmail(user, htmlMustache, txtMustache, context, "Mikvah Membership Renewal");
 
-            log.error("There was a problem sending the mikvah membership credit card update notification email.", e);
+    } catch (final Exception e) {
 
-        }
-    }
-
-    @Async
-    public void sendAutoRenewDisabledEmail(MikvahUser user, Membership membership) {
-        try {
-
-            Mustache htmlMustache = mustacheTemplateCache.get("emails/auto-renew-disabled.html.mustache");
-
-            Mustache txtMustache = mustacheTemplateCache.get("emails/auto-renew-disabled.txt.mustache");
-
-            Map<String, Object> context = new HashMap<>();
-            context.put(EXPIRATION_DATE, FRIENDLY_FORMAT.format(membership.getExpiration()));
-
-            sendEmail(user, htmlMustache, txtMustache, context, "Membership Automatic Renewal Disabled");
-
-        } catch (Exception e) {
-
-            log.error("There was a problem sending the mikvah membership auto-renew disabled email.", e);
-
-        }
-    }
-
-    @Async
-    public void sendAutoRenewEnabledEmail(MikvahUser user, Membership membership) {
-        try {
-
-            Mustache htmlMustache = mustacheTemplateCache.get("emails/auto-renew-enabled.html.mustache");
-
-            Mustache txtMustache = mustacheTemplateCache.get("emails/auto-renew-enabled.txt.mustache");
-
-            Map<String, Object> context = new HashMap<>();
-            context.put(EXPIRATION_DATE, FRIENDLY_FORMAT.format(membership.getExpiration()));
-
-            sendEmail(user, htmlMustache, txtMustache, context, "Membership Automatic Renewal Enabled");
-
-        } catch (Exception e) {
-
-            log.error("There was a problem sending the mikavh membership auto-reneal enabled email.", e);
-
-        }
+      log.error("There was a problem sending the mikvah membership renewal email.", e);
 
     }
 
-    @Async
-    public void sendUpcomingRenewalEmail(Invoice upcomingInvoice) {
-        try {
+    sendMembershipPaymentNotificationEmail(user.getFullName(),
+        membership.getPlan().getFormattedPrice());
 
-            String customerId = upcomingInvoice.getCustomer();
-            Optional<MikvahUser> userOptional = userRepository.findByStripeCustomerId(customerId);
-            if (!userOptional.isPresent()) {
-                log.error("Can't send email to unidentified user with upcoming renewal.");
-                return;
-            }
-            MikvahUser user = userOptional.get();
+  }
 
-            Mustache htmlMustache = mustacheTemplateCache.get("emails/upcoming-renewal.html.mustache");
+  @Async
+  public void sendCreditCardUpdateEmail(final MikvahUser user,
+      final Optional<Membership> membership) {
+    try {
 
-            Mustache txtMustache = mustacheTemplateCache.get("emails/upcoming-renewal.txt.mustache");
+      final Mustache htmlMustache =
+          mustacheTemplateCache.get("emails/credit-card-update.html.mustache");
 
-            Map<String, Object> context = new HashMap<>();
+      final Mustache txtMustache =
+          mustacheTemplateCache.get("emails/credit-card-update.txt.mustache");
 
-            Instant i = Instant.ofEpochSecond(upcomingInvoice.getNextPaymentAttempt());
-            ZonedDateTime renewalDate = ZonedDateTime.ofInstant(i, ZoneId.of(config.getTimeZone()));
-            String formattedRenewalDate = FRIENDLY_FORMAT.format(renewalDate);
+      final Map<String, Object> context = new HashMap<>();
 
-            context.put("renewalDate", formattedRenewalDate);
-            context.put(AMOUNT, currencyFormatter.format(upcomingInvoice.getAmountDue() / CENTS_PER_DOLLAR));
+      context.put("isAutoRenewingMember",
+          membership.isPresent() && membership.get().isAutoRenewEnabled());
 
-            sendEmail(user, htmlMustache, txtMustache, context, "Upcoming Mikvah Membership Renewal");
+      sendEmail(user, htmlMustache, txtMustache, context, "Credit Card Update");
 
-        } catch (Exception e) {
+    } catch (final Exception e) {
 
-            log.error("There was a problem sending the mikvah membership upcoming renewal notification email.", e);
-
-        }
-    }
-
-    @Async
-    public void sendMembershipEndedEmail(MikvahUser user) {
-
-        try {
-            Mustache htmlMustache = mustacheTemplateCache.get("emails/membership-ended.html.mustache");
-
-            Mustache txtMustache = mustacheTemplateCache.get("emails/membership-ended.txt.mustache");
-
-            Map<String, Object> context = new HashMap<>();
-
-            sendEmail(user, htmlMustache, txtMustache, context, "Membership Ended");
-
-        } catch (Exception e) {
-            log.error("There was a problem sending the membership ended email.", e);
-        }
+      log.error(
+          "There was a problem sending the mikvah membership credit card update notification email.",
+          e);
 
     }
+  }
 
-    @Async
-    public void sendDonationEmail(String name, String email, double amount) {
+  @Async
+  public void sendAutoRenewDisabledEmail(final MikvahUser user, final Membership membership) {
+    try {
 
-        String formattedAmount = NumberFormat.getCurrencyInstance().format(amount);
-        // Receipt to donor
-        try {
-            Mustache htmlMustache = mustacheTemplateCache.get("emails/donation-receipt.html.mustache");
+      final Mustache htmlMustache =
+          mustacheTemplateCache.get("emails/auto-renew-disabled.html.mustache");
 
-            Mustache txtMustache = mustacheTemplateCache.get("emails/donation-receipt.txt.mustache");
+      final Mustache txtMustache =
+          mustacheTemplateCache.get("emails/auto-renew-disabled.txt.mustache");
 
-            Map<String, Object> context = new HashMap<>();
-            context.put("name", name);
-            context.put(AMOUNT, formattedAmount);
-            context.put("date", FRIENDLY_FORMAT.format(LocalDateTime.now()));
+      final Map<String, Object> context = new HashMap<>();
+      context.put(EXPIRATION_DATE, FRIENDLY_FORMAT.format(membership.getExpiration()));
 
-            sendEmail(name, email, htmlMustache, txtMustache, context, "Donation Receipt");
+      sendEmail(user, htmlMustache, txtMustache, context, "Membership Automatic Renewal Disabled");
 
-        } catch (Exception e) {
-            log.error("There was a problem sending the donation receipt email.", e);
-        }
+    } catch (final Exception e) {
 
-        // Notification to mikvah staff
-        try {
-            Mustache htmlMustache = mustacheTemplateCache.get("emails/donation-notification.html.mustache");
+      log.error("There was a problem sending the mikvah membership auto-renew disabled email.", e);
 
-            Mustache txtMustache = mustacheTemplateCache.get("emails/donation-notification.txt.mustache");
+    }
+  }
 
-            Map<String, Object> context = new HashMap<>();
-            context.put("name", name);
-            context.put("donorEmail", email);
-            context.put(AMOUNT, formattedAmount);
-            context.put("date", FRIENDLY_FORMAT.format(LocalDateTime.now()));
-            sendEmail("Mikvah Treasurer", config.getMikvahTreasurerEmail(), htmlMustache, txtMustache, context,
-                    "Donation Notification");
+  @Async
+  public void sendAutoRenewEnabledEmail(final MikvahUser user, final Membership membership) {
+    try {
 
-        } catch (Exception e) {
+      final Mustache htmlMustache =
+          mustacheTemplateCache.get("emails/auto-renew-enabled.html.mustache");
 
-            log.error("There was a problem sending the donation notification email.", e);
+      final Mustache txtMustache =
+          mustacheTemplateCache.get("emails/auto-renew-enabled.txt.mustache");
 
-        }
+      final Map<String, Object> context = new HashMap<>();
+      context.put(EXPIRATION_DATE, FRIENDLY_FORMAT.format(membership.getExpiration()));
+
+      sendEmail(user, htmlMustache, txtMustache, context, "Membership Automatic Renewal Enabled");
+
+    } catch (final Exception e) {
+
+      log.error("There was a problem sending the mikavh membership auto-reneal enabled email.", e);
 
     }
 
-    private void sendMembershipPaymentNotificationEmail(String name, String formattedAmount) {
-        // Notification to mikvah staff
-        try {
-            Mustache htmlMustache = mustacheTemplateCache.get("emails/membership-notification.html.mustache");
+  }
 
-            Mustache txtMustache = mustacheTemplateCache.get("emails/membership-notification.txt.mustache");
+  @Async
+  public void sendUpcomingRenewalEmail(final Invoice upcomingInvoice) {
+    try {
 
-            Map<String, Object> context = new HashMap<>();
-            context.put("name", name);
-            context.put(AMOUNT, formattedAmount);
-            context.put("date", FRIENDLY_FORMAT.format(LocalDateTime.now()));
-            Recipient treasurer = new Recipient("Mikvah Treasurer", config.getMikvahTreasurerEmail(), RecipientType.TO);
-            Recipient membershipManager = new Recipient("Membership Manager", config.getMembershipManagerEmail(), RecipientType.TO);
-            Collection<Recipient> recipients = Arrays.asList(treasurer, membershipManager);
-            sendEmail(recipients, htmlMustache, txtMustache, context,
-                    "Donation Notification");
+      final String customerId = upcomingInvoice.getCustomer();
+      final Optional<MikvahUser> userOptional = userRepository.findByStripeCustomerId(customerId);
+      if (!userOptional.isPresent()) {
+        log.error("Can't send email to unidentified user with upcoming renewal.");
+        return;
+      }
+      final MikvahUser user = userOptional.get();
 
-        } catch (Exception e) {
+      final Mustache htmlMustache =
+          mustacheTemplateCache.get("emails/upcoming-renewal.html.mustache");
 
-            log.error("There was a problem sending the donation notification email.", e);
+      final Mustache txtMustache =
+          mustacheTemplateCache.get("emails/upcoming-renewal.txt.mustache");
 
-        }
+      final Map<String, Object> context = new HashMap<>();
+
+      final Instant i = Instant.ofEpochSecond(upcomingInvoice.getNextPaymentAttempt());
+      final ZonedDateTime renewalDate = ZonedDateTime.ofInstant(i, ZoneId.of(config.getTimeZone()));
+      final String formattedRenewalDate = FRIENDLY_FORMAT.format(renewalDate);
+
+      context.put("renewalDate", formattedRenewalDate);
+      context.put(AMOUNT,
+          currencyFormatter.format(upcomingInvoice.getAmountDue() / CENTS_PER_DOLLAR));
+
+      sendEmail(user, htmlMustache, txtMustache, context, "Upcoming Mikvah Membership Renewal");
+
+    } catch (final Exception e) {
+
+      log.error(
+          "There was a problem sending the mikvah membership upcoming renewal notification email.",
+          e);
+
+    }
+  }
+
+  @Async
+  public void sendMembershipEndedEmail(final MikvahUser user) {
+
+    try {
+      final Mustache htmlMustache =
+          mustacheTemplateCache.get("emails/membership-ended.html.mustache");
+
+      final Mustache txtMustache =
+          mustacheTemplateCache.get("emails/membership-ended.txt.mustache");
+
+      final Map<String, Object> context = new HashMap<>();
+
+      sendEmail(user, htmlMustache, txtMustache, context, "Membership Ended");
+
+    } catch (final Exception e) {
+      log.error("There was a problem sending the membership ended email.", e);
     }
 
-    private void sendEmail(MikvahUser user, Mustache htmlMustache, Mustache txtMustache, Map<String, Object> context,
-            String subject) {
+  }
 
-        sendEmail(user.getFullName(), user.getEmail(), htmlMustache, txtMustache, context, subject);
+  @Async
+  public void sendDonationEmail(final String name, final String email, final double amount) {
+
+    final String formattedAmount = NumberFormat.getCurrencyInstance().format(amount);
+    // Receipt to donor
+    try {
+      final Mustache htmlMustache =
+          mustacheTemplateCache.get("emails/donation-receipt.html.mustache");
+
+      final Mustache txtMustache =
+          mustacheTemplateCache.get("emails/donation-receipt.txt.mustache");
+
+      final Map<String, Object> context = new HashMap<>();
+      context.put("name", name);
+      context.put(AMOUNT, formattedAmount);
+      context.put("date", FRIENDLY_FORMAT.format(LocalDateTime.now()));
+
+      sendEmail(name, email, htmlMustache, txtMustache, context, "Donation Receipt");
+
+    } catch (final Exception e) {
+      log.error("There was a problem sending the donation receipt email.", e);
+    }
+
+    // Notification to mikvah staff
+    try {
+      final Mustache htmlMustache =
+          mustacheTemplateCache.get("emails/donation-notification.html.mustache");
+
+      final Mustache txtMustache =
+          mustacheTemplateCache.get("emails/donation-notification.txt.mustache");
+
+      final Map<String, Object> context = new HashMap<>();
+      context.put("name", name);
+      context.put("donorEmail", email);
+      context.put(AMOUNT, formattedAmount);
+      context.put("date", FRIENDLY_FORMAT.format(LocalDateTime.now()));
+      sendEmail("Mikvah Treasurer", config.getMikvahTreasurerEmail(), htmlMustache, txtMustache,
+          context,
+          "Donation Notification");
+
+    } catch (final Exception e) {
+
+      log.error("There was a problem sending the donation notification email.", e);
 
     }
 
-    private void sendEmail(String name, String emailAddress, Mustache htmlMustache, Mustache txtMustache,
-            Map<String, Object> context, String subject) {
+  }
 
-        StringWriter htmlWriter = new StringWriter();
-        StringWriter txtWriter = new StringWriter();
+  private void sendMembershipPaymentNotificationEmail(final String name,
+      final String formattedAmount) {
+    // Notification to mikvah staff
+    try {
+      final Mustache htmlMustache =
+          mustacheTemplateCache.get("emails/membership-notification.html.mustache");
 
-        htmlMustache.execute(htmlWriter, context);
-        txtMustache.execute(txtWriter, context);
+      final Mustache txtMustache =
+          mustacheTemplateCache.get("emails/membership-notification.txt.mustache");
 
-        Email email = EmailBuilder.startingBlank()
-                .from("Los Angeles Mikvah Society", config.getFromEmailAddress())
-                .to(name, emailAddress)
-                .withSubject(subject)
-                .withPlainText(txtWriter.toString())
-                .withHTMLText(htmlWriter.toString()).buildEmail();
+      final Map<String, Object> context = new HashMap<>();
+      context.put("name", name);
+      context.put(AMOUNT, formattedAmount);
+      context.put("date", FRIENDLY_FORMAT.format(LocalDateTime.now()));
+      final Recipient treasurer = new Recipient("Mikvah Treasurer",
+          config.getMikvahTreasurerEmail(), javax.mail.Message.RecipientType.TO);
+      final Recipient membershipManager = new Recipient("Membership Manager",
+          config.getMembershipManagerEmail(), javax.mail.Message.RecipientType.TO);
+      final Collection<Recipient> recipients = Arrays.asList(treasurer, membershipManager);
+      sendEmail(recipients, htmlMustache, txtMustache, context,
+          "Donation Notification");
 
-        mailer.sendMail(email, true);
+    } catch (final Exception e) {
+
+      log.error("There was a problem sending the donation notification email.", e);
+
     }
+  }
 
-    private void sendEmail(Collection<Recipient> recipients, Mustache htmlMustache, Mustache txtMustache,
-            Map<String, Object> context, String subject) {
+  private void sendEmail(final MikvahUser user, final Mustache htmlMustache,
+      final Mustache txtMustache, final Map<String, Object> context,
+      final String subject) {
 
-        StringWriter htmlWriter = new StringWriter();
-        StringWriter txtWriter = new StringWriter();
+    sendEmail(user.getFullName(), user.getEmail(), htmlMustache, txtMustache, context, subject);
 
-        htmlMustache.execute(htmlWriter, context);
-        txtMustache.execute(txtWriter, context);
+  }
 
-        Email email = EmailBuilder.startingBlank()
-                .from("Los Angeles Mikvah Society", config.getFromEmailAddress())
-                .to(recipients)
-                .withSubject(subject)
-                .withPlainText(txtWriter.toString())
-                .withHTMLText(htmlWriter.toString()).buildEmail();
+  private void sendEmail(final String name, final String emailAddress, final Mustache htmlMustache,
+      final Mustache txtMustache,
+      final Map<String, Object> context, final String subject) {
 
-        mailer.sendMail(email, true);
-    }
+    final StringWriter htmlWriter = new StringWriter();
+    final StringWriter txtWriter = new StringWriter();
+
+    htmlMustache.execute(htmlWriter, context);
+    txtMustache.execute(txtWriter, context);
+
+    final Email email = EmailBuilder.startingBlank()
+        .from("Los Angeles Mikvah Society", config.getFromEmailAddress())
+        .to(name, emailAddress)
+        .withSubject(subject)
+        .withPlainText(txtWriter.toString())
+        .withHTMLText(htmlWriter.toString()).buildEmail();
+
+    mailer.sendMail(email, true);
+  }
+
+  private void sendEmail(final Collection<Recipient> recipients, final Mustache htmlMustache,
+      final Mustache txtMustache,
+      final Map<String, Object> context, final String subject) {
+
+    final StringWriter htmlWriter = new StringWriter();
+    final StringWriter txtWriter = new StringWriter();
+
+    htmlMustache.execute(htmlWriter, context);
+    txtMustache.execute(txtWriter, context);
+
+    final Email email = EmailBuilder.startingBlank()
+        .from("Los Angeles Mikvah Society", config.getFromEmailAddress())
+        .to(recipients)
+        .withSubject(subject)
+        .withPlainText(txtWriter.toString())
+        .withHTMLText(htmlWriter.toString()).buildEmail();
+
+    mailer.sendMail(email, true);
+  }
 
 }
