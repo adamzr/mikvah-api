@@ -175,7 +175,6 @@ public class AppointmentService {
 
     final AppointmentSlot savedSlot = appointmentSlotRepository.save(newSlot);
 
-    //TODO: what kind of auditing do we need?
     final ReservationHistoryLog createdLog = ReservationHistoryLog.builder()
             .action(AppointmentAction.MADE).appointmentSlot(savedSlot)
             .created(LocalDateTime.now(Clock.systemUTC()))
