@@ -6,6 +6,8 @@ import lombok.Value;
 @Builder
 @Value
 public class AdminAppointmentView {
+    Long id;
+
     String time;
 
     String roomType;
