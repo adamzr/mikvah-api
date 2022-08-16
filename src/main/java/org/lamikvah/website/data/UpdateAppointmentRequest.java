@@ -9,4 +9,6 @@ public class UpdateAppointmentRequest {
 
     private LocalDateTime time;
 
+    private String notes;
+
 }
