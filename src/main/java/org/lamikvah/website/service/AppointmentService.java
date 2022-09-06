@@ -174,7 +174,7 @@ public class AppointmentService {
 
     final AppointmentSlot newSlot = possibleSlots.get(0);
     newSlot.setMikvahUser(existingSlot.getMikvahUser());
-    newSlot.setNotes(appointmentRequest.getNotes());
+    newSlot.setNotes(appointmentRequest.getNotes() == null ? existingSlot.getNotes() : appointmentRequest.getNotes());
     newSlot.setStripeChargeId(existingSlot.getStripeChargeId());
 
     final AppointmentSlot savedSlot = appointmentSlotRepository.save(newSlot);
