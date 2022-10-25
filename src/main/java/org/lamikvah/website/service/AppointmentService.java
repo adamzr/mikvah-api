@@ -156,6 +156,10 @@ public class AppointmentService {
 
     final LocalDateTime requestedTime = appointmentRequest.getTime();
 
+    if (requestedTime == null) {
+      return updateNotes(existingSlot, appointmentRequest.getNotes());
+    }
+
     final List<AppointmentSlot> possibleSlots = appointmentSlotRepository
             .findByStartAndRoomTypeAndMikvahUserIsNullOrderByIdAsc(requestedTime,
                     existingSlot.getRoomType());
@@ -170,7 +174,7 @@ public class AppointmentService {
 
     final AppointmentSlot newSlot = possibleSlots.get(0);
     newSlot.setMikvahUser(existingSlot.getMikvahUser());
-    newSlot.setNotes(existingSlot.getNotes());
+    newSlot.setNotes(appointmentRequest.getNotes() == null ? existingSlot.getNotes() : appointmentRequest.getNotes());
     newSlot.setStripeChargeId(existingSlot.getStripeChargeId());
 
     final AppointmentSlot savedSlot = appointmentSlotRepository.save(newSlot);
@@ -203,6 +207,19 @@ public class AppointmentService {
             .start(savedSlot.getStart())
             .notes(savedSlot.getNotes())
             .roomType(savedSlot.getRoomType())
+            .build();
+  }
+
+  private AppointmentSlotDto updateNotes(AppointmentSlot existingSlot, String notes) {
+    existingSlot.setNotes(notes);
+    appointmentSlotRepository.save(existingSlot);
+    log.info("Updated appointment {}", existingSlot);
+
+    return AppointmentSlotDto.builder()
+            .id(existingSlot.getId())
+            .start(existingSlot.getStart())
+            .notes(existingSlot.getNotes())
+            .roomType(existingSlot.getRoomType())
             .build();
   }
 
